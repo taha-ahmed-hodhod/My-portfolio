@@ -1,8 +1,9 @@
-import { useEffect, useRef, useState } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import type { FormEvent, KeyboardEvent } from 'react';
 import type { Locale } from '../types';
 
 type ChatMessage = { role: 'user' | 'assistant'; content: string };
+const MarkdownMessage = lazy(() => import('./MarkdownMessage'));
 
 const copy = {
   en: {
@@ -110,7 +111,11 @@ export function DigitalTwinChat({ locale }: { locale: Locale }) {
             <div className="digital-twin-welcome">{t.welcome}</div>
             {messages.map((message, index) => (
               <div className={'digital-twin-message ' + message.role} key={index}>
-                <p>{message.content}</p>
+                {message.role === 'assistant' ? (
+                  <Suspense fallback={<p>{message.content}</p>}>
+                    <MarkdownMessage content={message.content} />
+                  </Suspense>
+                ) : <p>{message.content}</p>}
               </div>
             ))}
             {busy && <div className="digital-twin-message assistant is-typing"><span /><span /><span /><em>{t.sending}</em></div>}
