@@ -65,7 +65,12 @@ export function DigitalTwinChat({ locale }: { locale: Locale }) {
         body: JSON.stringify({ messages: next.slice(-10) }),
         signal: AbortSignal.timeout(95_000),
       });
-      const result = await response.json();
+      const result = await response.json().catch(() => null);
+      if (!result || typeof result !== 'object') {
+        throw new Error(locale === 'ar'
+          ? 'خدمة الشات غير متصلة بهذا النشر. تأكد من نشر مسار /api/chat على Vercel ثم أعد النشر.'
+          : 'The chat API is not connected to this deployment. Make sure /api/chat is deployed on Vercel, then redeploy.');
+      }
       if (!response.ok) throw new Error(typeof result.error === 'string' ? result.error : t.failed);
       if (typeof result.answer !== 'string') throw new Error(t.failed);
       setMessages((current) => [...current, { role: 'assistant', content: result.answer }]);
