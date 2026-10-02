@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router';
 import type { Locale, PortfolioData, Project, ProjectCategory } from '../types';
-import { ui, buildResumeText } from '../i18n';
+import { ui } from '../i18n';
 import { Sculpture } from '../Sculpture';
+import { DigitalTwinChat } from '../components/DigitalTwinChat';
 
 const CATEGORIES: ProjectCategory[] = ['fullstack', 'frontend', 'backend', 'other'];
 
@@ -35,6 +36,7 @@ export function Portfolio({ data, locale, setLocale }: { data: PortfolioData; lo
   const [selected, setSelected] = useState<number | null>(null);
   const [notice, setNotice] = useState('');
   const dialog = useRef<HTMLDialogElement>(null);
+  const cvPdfUrl = `${import.meta.env.BASE_URL}Taha_Ahmed_Hodhod_CV.pdf`;
 
   const L = (en: string, ar: string) => (locale === 'ar' ? ar : en);
   const name = L(p.name_en, p.name_ar);
@@ -68,27 +70,6 @@ export function Portfolio({ data, locale, setLocale }: { data: PortfolioData; lo
     return () => clearTimeout(timer);
   }, [notice]);
 
-  function download() {
-    const text = buildResumeText(locale, {
-      name, role,
-      location: L(p.location_en, p.location_ar),
-      email: p.email, phone: p.phone,
-      intro: L(p.intro_en, p.intro_ar),
-      projects: data.projects.map((x) => ({ name: x.name, headline: L(x.headline_en, x.headline_ar), summary: L(x.summary_en, x.summary_ar) })),
-      experiences: data.experiences.map((x) => ({ date: L(x.date_en, x.date_ar), company: L(x.company_en, x.company_ar), role: L(x.role_en, x.role_ar), body: L(x.body_en, x.body_ar) })),
-      skills: data.skills.map((x) => ({ title: L(x.title_en, x.title_ar), items: L(x.items_en, x.items_ar) })),
-      education: data.education.map((x) => ({ title: L(x.title_en, x.title_ar), org: L(x.org_en, x.org_ar), date: L(x.date_en, x.date_ar), details: L(x.details_en, x.details_ar) })),
-    });
-    const blob = new Blob(['﻿' + text], { type: 'text/plain;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'taha-hodhod-resume-' + locale + '.txt';
-    document.body.append(a); a.click(); a.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
-    setNotice(t.downloaded);
-  }
-
   async function copyEmail() {
     try { await navigator.clipboard.writeText(p.email); setNotice(t.copied); }
     catch { setNotice(t.copyFailed); }
@@ -100,6 +81,7 @@ export function Portfolio({ data, locale, setLocale }: { data: PortfolioData; lo
     <>
       <a className="skip-link" href="#work">{t.skip}</a>
       <div className="screen-content">
+        <DigitalTwinChat locale={locale} />
         <header className="site-header">
           <a href="#top" className="wordmark" aria-label={name}>
             <span className="logo-mark" aria-hidden="true">✳</span>
@@ -126,7 +108,7 @@ export function Portfolio({ data, locale, setLocale }: { data: PortfolioData; lo
               <p className="hero-description">{L(p.intro_en, p.intro_ar)}</p>
               <div className="hero-actions">
                 <a className="primary-action" href="#work">{t.viewWork}<Arrow /></a>
-                <button className="text-action" onClick={download}>{t.download}<span aria-hidden="true">↓</span></button>
+                <a className="text-action" href={cvPdfUrl} download="Taha_Ahmed_Hodhod_CV.pdf" onClick={() => setNotice(t.downloaded)}>{t.download}<span aria-hidden="true">↓</span></a>
               </div>
               {data.source === 'local' && <p className="fiction-notice"><span aria-hidden="true">◌</span> {t.localNotice}</p>}
             </div>
@@ -264,8 +246,8 @@ export function Portfolio({ data, locale, setLocale }: { data: PortfolioData; lo
                   {p.linkedin && <a href={p.linkedin} target="_blank" rel="noreferrer">LinkedIn ↗</a>}
                 </div>
                 <div className="resume-actions">
-                  <button onClick={download}>{t.download} ↓</button>
-                  <button onClick={() => window.print()}>{t.print} ↗</button>
+                  <a href={cvPdfUrl} download="Taha_Ahmed_Hodhod_CV.pdf" onClick={() => setNotice(t.downloaded)}>{t.download} ↓</a>
+                  <a href={cvPdfUrl} target="_blank" rel="noreferrer">{t.print} ↗</a>
                 </div>
               </div>
             </div>

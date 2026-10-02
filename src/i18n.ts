@@ -6,7 +6,7 @@ export const ui = {
     nav: ['Work', 'Experience', 'Contact'],
     viewWork: 'Explore my work',
     download: 'Download resume',
-    downloaded: 'Your text resume is ready to download',
+    downloaded: 'Your CV download has started',
     contactMe: 'Get in touch',
     selected: 'Selected work',
     selectedSub: 'Real projects, built end to end',

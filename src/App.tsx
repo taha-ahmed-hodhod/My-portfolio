@@ -27,7 +27,7 @@ function Site() {
       {!loaded && (
         <LoadingScreen
           done={!!data}
-          name={locale === 'ar' ? 'طه هدهد' : 'TAHA HODHOD'}
+          name="TAHA HODHOD"
           tagline={ui[locale].loadingTag}
           onFinish={() => setLoaded(true)}
         />

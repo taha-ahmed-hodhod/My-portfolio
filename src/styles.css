@@ -777,12 +777,14 @@ section[id] {
   flex-wrap: wrap;
   margin-top: 24px;
 }
-.resume-actions button {
+.resume-actions button,
+.resume-actions a {
   font-size: 10px;
   color: var(--muted);
   padding: 10px 0;
 }
-.resume-actions button:hover {
+.resume-actions button:hover,
+.resume-actions a:hover {
   color: var(--ink);
 }
 .site-footer {
