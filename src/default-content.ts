@@ -1,0 +1,167 @@
+import type { PortfolioData } from './types';
+
+export const defaultData: PortfolioData = {
+  source: 'local',
+  profile: {
+    name_en: 'Taha Ahmed Hodhod',
+    name_ar: 'طه أحمد هدهد',
+    role_en: 'Full Stack Developer — MEARN Stack',
+    role_ar: 'مطور Full Stack — MEARN Stack',
+    statement_en: 'Clean code.\nBuilt to scale.',
+    statement_ar: 'كود نظيف.\nومعمارية قابلة للتوسع.',
+    intro_en:
+      'Full Stack Developer skilled in React.js, Next.js, TypeScript, Node.js, and MongoDB. Graduate of the intensive MEARN stack program at ITI, building real-world projects including a hospital management system and an e-commerce platform. Passionate about clean code, scalable architecture, and continuous learning.',
+    intro_ar:
+      'مطور Full Stack متمكّن في React.js وNext.js وTypeScript وNode.js وMongoDB. خريج برنامج MEARN المكثّف من معهد تكنولوجيا المعلومات (ITI)، بنيت مشاريع حقيقية تشمل نظام إدارة مستشفيات ومنصة تجارة إلكترونية. شغوف بالكود النظيف والمعمارية القابلة للتوسع والتعلم المستمر.',
+    about_en:
+      'I care about products that work end to end: a clean interface, a sensible API, and a database schema that will not fight you later. From the first wireframe to deployment, I like owning the whole flow — and I learn fast whatever the project needs next.',
+    about_ar:
+      'أهتم بالمنتجات المتكاملة من البداية للنهاية: واجهة نظيفة، وواجهة برمجية منطقية، وقاعدة بيانات لا تسبب مشاكل لاحقًا. من أول رسمة للواجهة حتى النشر، أحب أن أمتلك الرحلة كاملة — وأتعلم بسرعة أي تقنية يحتاجها المشروع.',
+    location_en: 'Damietta, Egypt · Open to opportunities',
+    location_ar: 'دمياط، مصر · متاح لفرص العمل',
+    available_en: 'Open to the right opportunity',
+    available_ar: 'متاح للفرصة المناسبة',
+    email: 'tahahodhod650@gmail.com',
+    phone: '010 332 70707',
+    github: 'https://github.com/',
+    linkedin: 'https://www.linkedin.com/',
+    photo_url: '',
+    years_label: '2024 — 2026',
+  },
+  experiences: [
+    {
+      date_en: 'Jun 2026 — Jul 2026',
+      date_ar: 'يونيو 2026 — يوليو 2026',
+      company_en: 'Information Technology Institute (ITI) — Port Said',
+      company_ar: 'معهد تكنولوجيا المعلومات (ITI) — بورسعيد',
+      role_en: 'Intensive Training Program — Full Stack Development (MEARN)',
+      role_ar: 'البرنامج التدريبي المكثف — تطوير Full Stack (MEARN)',
+      body_en:
+        'Developed real-world projects covering the full MEARN stack: MongoDB, Express.js, Angular, React, and Node.js. Projects include a hospital management system (CareHub), an e-commerce platform, and an examination system.',
+      body_ar:
+        'تطوير مشاريع حقيقية تغطي حزمة MEARN كاملة: MongoDB وExpress.js وAngular وReact وNode.js. تشمل المشاريع نظام إدارة مستشفيات (CareHub) ومنصة تجارة إلكترونية ونظام اختبارات.',
+      sort_order: 1,
+    },
+    {
+      date_en: 'Jan 2025 — Aug 2025',
+      date_ar: 'يناير 2025 — أغسطس 2025',
+      company_en: 'SEF Academy',
+      company_ar: 'أكاديمية SEF',
+      role_en: 'Frontend Development Training',
+      role_ar: 'تدريب تطوير واجهات Frontend',
+      body_en: 'HTML, CSS, JavaScript, React.js, Bootstrap, Git & GitHub.',
+      body_ar: 'HTML وCSS وJavaScript وReact.js وBootstrap وGit وGitHub.',
+      sort_order: 2,
+    },
+    {
+      date_en: 'May 2024 — Dec 2024',
+      date_ar: 'مايو 2024 — ديسمبر 2024',
+      company_en: 'Self-directed',
+      company_ar: 'تعلم ذاتي',
+      role_en: 'Frontend Web Development — Self Study',
+      role_ar: 'تطوير واجهات الويب — تعلم ذاتي',
+      body_en: 'HTML, CSS, JavaScript, Bootstrap, Git & GitHub.',
+      body_ar: 'HTML وCSS وJavaScript وBootstrap وGit وGitHub.',
+      sort_order: 3,
+    },
+  ],
+  projects: [
+    {
+      name: 'CareHub — Hospital Management System',
+      year: '2026',
+      category: 'fullstack',
+      headline_en: 'A full-stack hospital system, from patient records to prescriptions',
+      headline_ar: 'نظام مستشفيات متكامل، من سجلات المرضى إلى الروشتات',
+      summary_en:
+        'Built with Next.js, Node.js, Nest.js, MongoDB, Mongoose and Express.js. Features patient records, prescription management, medical history tracking, and role-based access.',
+      summary_ar:
+        'مبني بـ Next.js وNode.js وNest.js وMongoDB وMongoose وExpress.js. يشمل سجلات المرضى وإدارة الروشتات وتتبع التاريخ الطبي وصلاحيات حسب الدور.',
+      tags: ['NEXT.JS', 'NEST.JS', 'MONGODB', 'EXPRESS'],
+      demo_url: '',
+      code_url: '',
+      image_url: '',
+      sort_order: 1,
+    },
+    {
+      name: 'Next E-Commerce Platform',
+      year: '2026',
+      category: 'fullstack',
+      headline_en: 'A store with real cart state, toasts and motion',
+      headline_ar: 'متجر إلكتروني بسلة حقيقية وتنبيهات وأنيميشن',
+      summary_en:
+        'Next.js 14 (App Router) with Tailwind CSS for a fully responsive UI, Redux Toolkit for cart and global state, MongoDB with Mongoose for products and orders, plus Framer Motion animations and React Hot Toast notifications.',
+      summary_ar:
+        'Next.js 14 (App Router) مع Tailwind CSS لواجهة متجاوبة بالكامل، وRedux Toolkit للسلة والحالة العامة، وMongoDB مع Mongoose للمنتجات والطلبات، وأنيميشن Framer Motion وتنبيهات React Hot Toast.',
+      tags: ['NEXT.JS 14', 'REDUX', 'TAILWIND', 'MONGODB'],
+      demo_url: '',
+      code_url: '',
+      image_url: '',
+      sort_order: 2,
+    },
+    {
+      name: 'Angular Blog System',
+      year: '2026',
+      category: 'fullstack',
+      headline_en: 'A blogging platform with auth and full CRUD',
+      headline_ar: 'منصة تدوين بتسجيل دخول وعمليات CRUD كاملة',
+      summary_en:
+        'Full-stack blogging platform built with Angular, Node.js, and MongoDB. Features user authentication, full CRUD for posts, and a clean responsive UI.',
+      summary_ar:
+        'منصة تدوين متكاملة مبنية بـ Angular وNode.js وMongoDB. تشمل تسجيل دخول المستخدمين وعمليات CRUD كاملة للمقالات وواجهة متجاوبة نظيفة.',
+      tags: ['ANGULAR', 'NODE.JS', 'MONGODB'],
+      demo_url: '',
+      code_url: '',
+      image_url: '',
+      sort_order: 3,
+    },
+    {
+      name: 'Examination System',
+      year: '2026',
+      category: 'frontend',
+      headline_en: 'Timed quizzes with instant results',
+      headline_ar: 'اختبارات بمؤقت ونتائج فورية',
+      summary_en:
+        'Interactive front-end examination system built with HTML, CSS, JavaScript, and Animate.css. Supports timed quizzes, dynamic question rendering, and instant result calculation.',
+      summary_ar:
+        'نظام اختبارات تفاعلي مبني بـ HTML وCSS وJavaScript وAnimate.css. يدعم الاختبارات المؤقتة وعرض الأسئلة ديناميكيًا وحساب النتيجة فوريًا.',
+      tags: ['JAVASCRIPT', 'HTML', 'CSS'],
+      demo_url: '',
+      code_url: '',
+      image_url: '',
+      sort_order: 4,
+    },
+  ],
+  skills: [
+    { title_en: 'Frontend', title_ar: 'الواجهات الأمامية', items_en: 'HTML5 · CSS3 · JavaScript (ES6+) · TypeScript · React.js · Next.js', items_ar: 'HTML5 · CSS3 · JavaScript (ES6+) · TypeScript · React.js · Next.js', sort_order: 1 },
+    { title_en: 'Styling', title_ar: 'التنسيق', items_en: 'Tailwind CSS · Bootstrap', items_ar: 'Tailwind CSS · Bootstrap', sort_order: 2 },
+    { title_en: 'Backend', title_ar: 'الواجهات الخلفية', items_en: 'Node.js · Express.js', items_ar: 'Node.js · Express.js', sort_order: 3 },
+    { title_en: 'Databases', title_ar: 'قواعد البيانات', items_en: 'MongoDB · Mongoose', items_ar: 'MongoDB · Mongoose', sort_order: 4 },
+    { title_en: 'State & Tools', title_ar: 'الحالة والأدوات', items_en: 'Redux Toolkit · Git · GitHub', items_ar: 'Redux Toolkit · Git · GitHub', sort_order: 5 },
+  ],
+  education: [
+    {
+      kind: 'degree',
+      title_en: 'Bachelor of Islamic Studies',
+      title_ar: 'ليسانس الدراسات الإسلامية',
+      org_en: 'Al-Azhar University, Egypt',
+      org_ar: 'جامعة الأزهر، مصر',
+      date_en: 'Jul 2019 — Jun 2023',
+      date_ar: 'يوليو 2019 — يونيو 2023',
+      details_en: 'Grade: Good',
+      details_ar: 'التقدير: جيد',
+      sort_order: 1,
+    },
+    {
+      kind: 'course',
+      title_en: 'Full-Stack MEARN — ICC Certification',
+      title_ar: 'Full-Stack MEARN — شهادة ICC',
+      org_en: 'Information Technology Institute (ITI), Port Said',
+      org_ar: 'معهد تكنولوجيا المعلومات (ITI)، بورسعيد',
+      date_en: 'Jan 2026 — Jul 2026',
+      date_ar: 'يناير 2026 — يوليو 2026',
+      details_en: 'Hands-on training in Node.js, React, Express, Angular, and MongoDB.',
+      details_ar: 'تدريب عملي على Node.js وReact وExpress وAngular وMongoDB.',
+      sort_order: 2,
+    },
+  ],
+};

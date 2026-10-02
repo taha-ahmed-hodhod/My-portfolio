@@ -1,0 +1,27 @@
+/* Release adaptation: touch targets and device safe areas, without changing cover art. */
+@media screen {
+  body {
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-right: env(safe-area-inset-right, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    padding-left: env(safe-area-inset-left, 0px);
+  }
+  .screen-content button,
+  .case-dialog button { min-width: 44px; min-height: 44px; }
+  .dialog-top button { width: 44px; height: 44px; }
+  .project-demo .cr-mask-toggle,
+  .project-demo .mg-present-controls button { min-height: 44px; }
+  .site-header nav a,
+  .hero-baseline > a,
+  .site-footer > a,
+  .case-reference > a {
+    display: inline-flex;
+    align-items: center;
+    min-width: 44px;
+    min-height: 44px;
+  }
+  .case-dialog {
+    max-height: calc(92dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+  }
+  .toast { bottom: calc(16px + env(safe-area-inset-bottom, 0px)); }
+}
