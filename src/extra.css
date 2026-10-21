@@ -303,6 +303,51 @@
   border: 1px solid var(--line);
   margin: 10px 0 22px;
 }
+.technology-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+.technology-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 10px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--muted);
+  font-size: 11px;
+}
+.technology-chip img {
+  width: 15px;
+  height: 15px;
+  object-fit: contain;
+}
+.technology-icon-fallback {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 15px;
+  height: 15px;
+  border: 1px solid currentColor;
+  border-radius: 4px;
+  font-size: 7px;
+  line-height: 1;
+  font-weight: 700;
+}
+.technology-icon-loading {
+  display: inline-block;
+  width: 15px;
+  height: 15px;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: technology-icon-spin 0.7s linear infinite;
+}
+@keyframes technology-icon-spin {
+  to { transform: rotate(360deg); }
+}
 
 /* ===== Contact extras ===== */
 .contact-buttons {
@@ -812,8 +857,10 @@
   color: var(--ink);
 }
 .admin-wide {
-  display: block;
-  max-width: 1080px;
+  display: grid;
+  grid-template-columns: 190px minmax(0, 1fr);
+  column-gap: 44px;
+  max-width: 1180px;
   margin-inline: auto;
   padding-bottom: 120px;
 }
@@ -1026,27 +1073,57 @@
   color: var(--accent);
 }
 .admin-top {
+  grid-column: 1;
+  grid-row: 1 / span 2;
+  position: sticky;
+  top: 0;
+  align-self: start;
+  min-height: 100vh;
   display: flex;
-  align-items: center;
-  gap: 24px;
-  flex-wrap: wrap;
-  padding: 28px 0;
-  border-bottom: 1px solid var(--line);
-  margin-bottom: 28px;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 30px;
+  padding: 34px 0;
+  border-bottom: 0;
+  border-inline-end: 1px solid var(--line);
+  margin-bottom: 0;
+  padding-inline-end: 24px;
+}
+.admin-brand {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  min-width: 150px;
+}
+.admin-brand > span {
+  font-size: 9px;
+  letter-spacing: 0.16em;
+  color: var(--accent);
 }
 .admin-top nav {
   display: flex;
+  flex-direction: column;
   gap: 6px;
-  flex: 1;
-  flex-wrap: wrap;
 }
 .admin-top nav button {
+  text-align: start;
   font-size: 12px;
   padding: 10px 16px;
-  border-radius: 999px;
+  border-radius: 6px;
   color: var(--muted);
   border: 1px solid transparent;
   text-transform: capitalize;
+}
+.admin-top > .link-btn {
+  margin-top: auto;
+  text-align: start;
+  width: fit-content;
+}
+.admin-wide > .admin-section {
+  grid-column: 2;
+}
+.admin-wide > .admin-operation-error {
+  grid-column: 2;
 }
 .admin-top nav button.is-active {
   background: var(--ink);
@@ -1064,6 +1141,19 @@
   font-weight: 600;
   z-index: 60;
   animation: fadeUp 0.4s var(--ease);
+}
+.admin-operation-error {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 13px 16px;
+  margin-bottom: 24px;
+  border: 1px solid rgba(255, 138, 155, 0.28);
+  border-radius: 8px;
+  background: rgba(255, 138, 155, 0.06);
+}
+.admin-operation-error .link-btn {
+  color: var(--ink);
 }
 .admin-section h2 {
   font-size: 22px;
@@ -1222,17 +1312,27 @@
   }
 }
 @media (max-width: 700px) {
+  .admin-wide {
+    display: block;
+    max-width: none;
+  }
   .admin-page.admin-wide {
     padding-inline: 12px;
   }
   .admin-top {
+    position: static;
+    min-height: 0;
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
     align-items: center;
     gap: 14px 10px;
     padding: 18px 0;
+    border-bottom: 1px solid var(--line);
+    border-inline-end: 0;
+    margin-bottom: 28px;
+    padding-inline-end: 0;
   }
-  .admin-top > .admin-back {
+  .admin-top > .admin-brand {
     grid-column: 1;
     grid-row: 1;
   }
@@ -1242,6 +1342,7 @@
     justify-self: end;
   }
   .admin-top nav {
+    flex-direction: row;
     grid-column: 1 / -1;
     grid-row: 2;
     width: 100%;
@@ -1261,6 +1362,17 @@
     min-height: 42px;
     padding: 9px 13px;
     white-space: nowrap;
+  }
+  .admin-brand {
+    min-width: 0;
+  }
+  .admin-brand > span {
+    display: none;
+  }
+  .admin-operation-error {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 8px;
   }
 }
 @media print {

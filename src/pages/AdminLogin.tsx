@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router';
-import { supabase, isSupabaseConfigured } from '../lib/supabase';
+import { supabase, isSupabaseConfigured, isAdminEmail } from '../lib/supabase';
 
 export function AdminLogin() {
   const navigate = useNavigate();
@@ -12,9 +12,15 @@ export function AdminLogin() {
 
   useEffect(() => {
     if (!supabase) return;
+    const client = supabase;
     let active = true;
-    supabase.auth.getSession().then(({ data }) => {
-      if (active && data.session) navigate('/admin/dashboard', { replace: true });
+    client.auth.getSession().then(async ({ data }) => {
+      if (!active || !data.session) return;
+      if (isAdminEmail(data.session.user.email)) {
+        navigate('/admin/dashboard', { replace: true });
+      } else {
+        await client.auth.signOut();
+      }
     });
     return () => { active = false; };
   }, [navigate]);
@@ -22,6 +28,10 @@ export function AdminLogin() {
   async function submit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (!supabase || busy) return;
+    if (!isAdminEmail(email)) {
+      setError('This account is not authorized to access the admin workspace.');
+      return;
+    }
     setBusy(true);
     setError('');
     try {

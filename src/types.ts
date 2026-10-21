@@ -1,5 +1,21 @@
 export type Locale = 'en' | 'ar';
-export type ProjectCategory = 'fullstack' | 'frontend' | 'backend' | 'other';
+export type ProjectCategory = string;
+
+export interface ProjectCategoryOption {
+  id?: number;
+  slug: string;
+  name_en: string;
+  name_ar: string;
+  sort_order: number;
+}
+
+export interface Technology {
+  id?: number;
+  slug: string;
+  name: string;
+  icon: string;
+  sort_order: number;
+}
 
 export interface Profile {
   id?: number;
@@ -55,11 +71,25 @@ export interface Education {
   sort_order: number;
 }
 
+export interface Certificate {
+  id?: number;
+  title: string;
+  issuer: string;
+  issue_date: string;
+  image_url: string;
+  verification_url: string;
+  is_published: boolean;
+  sort_order: number;
+}
+
 export interface PortfolioData {
   profile: Profile;
   experiences: Experience[];
   projects: Project[];
   skills: SkillGroup[];
   education: Education[];
+  categories: ProjectCategoryOption[];
+  technologies: Technology[];
+  certificates: Certificate[];
   source: 'remote' | 'local';
 }

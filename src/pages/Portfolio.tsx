@@ -4,11 +4,75 @@ import type { Locale, PortfolioData, Project, ProjectCategory } from '../types';
 import { ui } from '../i18n';
 import { Sculpture } from '../Sculpture';
 import { DigitalTwinChat } from '../components/DigitalTwinChat';
-
-const CATEGORIES: ProjectCategory[] = ['fullstack', 'frontend', 'backend', 'other'];
+import { findTechnologyIcons, savedTechnologyIconUrl } from '../lib/technology-icons';
 
 function Arrow({ diagonal = false }: { diagonal?: boolean }) {
   return <span aria-hidden="true">{diagonal ? '↗' : '↘'}</span>;
+}
+
+function technologySlug(name: string): string {
+  return name
+    .toLowerCase()
+    .trim()
+    .replace(/[+#]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '');
+}
+
+function TechnologyIcon({ technology }: { technology: { name: string; icon: string } }) {
+  const [candidates, setCandidates] = useState<string[]>([]);
+  const [candidateIndex, setCandidateIndex] = useState(0);
+  const [failed, setFailed] = useState(false);
+  const [searching, setSearching] = useState(!technology.icon.includes(':'));
+  const fallback = technology.name.trim().slice(0, 2).toUpperCase();
+  useEffect(() => {
+    let active = true;
+    setFailed(false);
+    setCandidateIndex(0);
+    const savedIcon = savedTechnologyIconUrl(technology.icon);
+    if (savedIcon) {
+      setSearching(false);
+      setCandidates([savedIcon]);
+    } else {
+      setSearching(true);
+      setCandidates([]);
+      void findTechnologyIcons(technology.name, technology.icon).then((resolved) => {
+        if (active) {
+          setCandidates(resolved);
+          setSearching(false);
+        }
+      });
+    }
+    return () => { active = false; };
+  }, [technology.name, technology.icon]);
+
+  const iconUrl = candidates[candidateIndex];
+  if (searching) return <span className="technology-icon-loading" aria-hidden="true" />;
+  if (!iconUrl || failed) return <span className="technology-icon-fallback" aria-hidden="true">{fallback}</span>;
+  return (
+    <img
+      src={iconUrl}
+      alt=""
+      loading="lazy"
+      onError={() => {
+        if (candidateIndex + 1 < candidates.length) setCandidateIndex((index) => index + 1);
+        else setFailed(true);
+      }}
+    />
+  );
+}
+
+function findTechnology(name: string, technologies: PortfolioData['technologies']) {
+  const slug = technologySlug(name);
+  const normalized = name.toLowerCase().replace(/\s+/g, ' ').trim();
+  return technologies.find((item) => {
+    const catalogName = item.name.toLowerCase().trim();
+    const catalogBaseName = catalogName.replace(/\s*\([^)]*\)/g, '').trim();
+    return item.slug === slug
+      || catalogName === normalized
+      || catalogBaseName === normalized.replace(/\s*\([^)]*\)/g, '').trim()
+      || normalized.startsWith(catalogName + ' ');
+  });
 }
 
 function Cover({ p, index }: { p: Project; index: number }) {
@@ -42,6 +106,7 @@ export function Portfolio({ data, locale, setLocale }: { data: PortfolioData; lo
   const name = L(p.name_en, p.name_ar);
   const role = L(p.role_en, p.role_ar);
   const items = category === 'all' ? data.projects : data.projects.filter((x) => x.category === category);
+  const categories = data.categories;
   const project = data.projects.find((x) => x.id === selected) ?? null;
   const degrees = data.education.filter((e) => e.kind === 'degree');
   const courses = data.education.filter((e) => e.kind === 'course');
@@ -138,11 +203,15 @@ export function Portfolio({ data, locale, setLocale }: { data: PortfolioData; lo
             </div>
             <div className="filter-row">
               <div role="group" aria-label="Project categories">
-                {(['all', ...CATEGORIES] as const).map((k) => (
+                {(['all', ...categories.map((item) => item.slug)] as const).map((k) => {
+                  const option = categories.find((item) => item.slug === k);
+                  const label = k === 'all' ? t.all : (locale === 'ar' ? option?.name_ar : option?.name_en) || k;
+                  return (
                   <button key={k} onClick={() => setCategory(k)} aria-pressed={category === k}>
-                    {t[k]}{k === 'all' && <span>{String(data.projects.length).padStart(2, '0')}</span>}
+                    {label}{k === 'all' && <span>{String(data.projects.length).padStart(2, '0')}</span>}
                   </button>
-                ))}
+                  );
+                })}
               </div>
               <span role="status" aria-live="polite">{items.length} {t.resultCount}</span>
             </div>
@@ -201,7 +270,20 @@ export function Portfolio({ data, locale, setLocale }: { data: PortfolioData; lo
               <div><h3>{t.toolkit}</h3><p>{t.toolNote}</p></div>
               <div className="skill-list">
                 {data.skills.map((g) => (
-                  <div key={g.id ?? g.title_en}><h4>{L(g.title_en, g.title_ar)}</h4><p>{L(g.items_en, g.items_ar)}</p></div>
+                  <div key={g.id ?? g.title_en}>
+                    <h4>{L(g.title_en, g.title_ar)}</h4>
+                    <div className="technology-list">
+                      {L(g.items_en, g.items_ar).split(/[·,]/).map((name) => name.trim()).filter(Boolean).map((name) => {
+                        const technology = findTechnology(name, data.technologies);
+                        return (
+                          <span className="technology-chip" key={name}>
+                            {technology && <TechnologyIcon technology={technology} />}
+                            <span>{name}</span>
+                          </span>
+                        );
+                      })}
+                    </div>
+                  </div>
                 ))}
               </div>
             </div>
@@ -302,7 +384,7 @@ export function Portfolio({ data, locale, setLocale }: { data: PortfolioData; lo
         {project && (
           <>
             <div className="dialog-top">
-              <span>{project.year} · {t[project.category]}</span>
+              <span>{project.year} · {(locale === 'ar' ? data.categories.find((item) => item.slug === project.category)?.name_ar : data.categories.find((item) => item.slug === project.category)?.name_en) || project.category}</span>
               <button autoFocus aria-label={t.close} onClick={() => setSelected(null)}>×</button>
             </div>
             <div className="dialog-content">

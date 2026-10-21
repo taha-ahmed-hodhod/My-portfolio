@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router';
-import { supabase, isSupabaseConfigured, STORAGE_BUCKET } from '../lib/supabase';
+import { supabase, isSupabaseConfigured, STORAGE_BUCKET, isAdminEmail } from '../lib/supabase';
 import { defaultData } from '../default-content';
-import type { Profile, Experience, Project, SkillGroup, Education } from '../types';
+import type { Profile, Experience, Project, SkillGroup, Education, ProjectCategoryOption, Technology, Certificate } from '../types';
 
-type Tab = 'profile' | 'experiences' | 'projects' | 'skills' | 'education';
+type Tab = 'profile' | 'experiences' | 'projects' | 'skills' | 'education' | 'categories' | 'technologies' | 'certificates';
 
 /* ---------- small form helpers ---------- */
 
@@ -19,13 +19,66 @@ function Field({ label, value, onChange, textarea }: { label: string; value: str
   );
 }
 
+function technologySlug(name: string): string {
+  return name
+    .toLowerCase()
+    .trim()
+    .replace(/[+#]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '');
+}
+
+function skillTechnologyNames(groups: Array<Pick<SkillGroup, 'items_en'>>): string[] {
+  return [...new Set(groups
+    .flatMap((group) => group.items_en.split(/[·,]/))
+    .map((name) => name.trim())
+    .filter(Boolean))];
+}
+
+function errorMessage(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  if (error && typeof error === 'object') {
+    const details = error as { message?: string; details?: string; hint?: string; code?: string };
+    return [details.message, details.details, details.hint, details.code ? `code: ${details.code}` : '']
+      .filter(Boolean)
+      .join(' — ') || JSON.stringify(error);
+  }
+  return String(error);
+}
+
 async function uploadImage(file: File, folder: string): Promise<string> {
   if (!supabase) throw new Error('not configured');
-  const ext = file.name.split('.').pop() || 'jpg';
-  const path = folder + '/' + Date.now() + '.' + ext;
-  const { error } = await supabase.storage.from(STORAGE_BUCKET).upload(path, file, { upsert: true });
+  const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
+  if (!allowedTypes.includes(file.type)) throw new Error('Use a JPG, PNG, or WebP image.');
+  if (file.size > 10 * 1024 * 1024) throw new Error('Images must be 10 MB or smaller.');
+
+  const optimized = await optimizeImage(file);
+  const path = folder + '/' + Date.now() + '.webp';
+  const { error } = await supabase.storage.from(STORAGE_BUCKET).upload(path, optimized, {
+    upsert: true,
+    contentType: 'image/webp',
+  });
   if (error) throw error;
   return supabase.storage.from(STORAGE_BUCKET).getPublicUrl(path).data.publicUrl;
+}
+
+async function optimizeImage(file: File): Promise<Blob> {
+  const image = await createImageBitmap(file);
+  const maxDimension = 2000;
+  const scale = Math.min(1, maxDimension / Math.max(image.width, image.height));
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.max(1, Math.round(image.width * scale));
+  canvas.height = Math.max(1, Math.round(image.height * scale));
+  const context = canvas.getContext('2d');
+  if (!context) throw new Error('Could not prepare the image.');
+  context.drawImage(image, 0, 0, canvas.width, canvas.height);
+  image.close();
+
+  const blob = await new Promise<Blob | null>((resolve) => {
+    canvas.toBlob(resolve, 'image/webp', 0.84);
+  });
+  if (!blob) throw new Error('Could not optimize the image.');
+  return blob;
 }
 
 function ImagePicker({ value, folder, onChange }: { value: string; folder: string; onChange: (url: string) => void }) {
@@ -69,36 +122,59 @@ export function AdminDashboard() {
   const [ready, setReady] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState('');
+    const [loadError, setLoadError] = useState('');
 
   const [profile, setProfile] = useState<Profile>(defaultData.profile);
   const [experiences, setExperiences] = useState<Experience[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [skills, setSkills] = useState<SkillGroup[]>([]);
   const [education, setEducation] = useState<Education[]>([]);
+  const [categories, setCategories] = useState<ProjectCategoryOption[]>([]);
+  const [technologies, setTechnologies] = useState<Technology[]>([]);
+  const [certificates, setCertificates] = useState<Certificate[]>([]);
 
   const flash = (msg: string) => { setSaved(msg); setTimeout(() => setSaved(''), 3000); };
 
   const load = useCallback(async () => {
     if (!supabase) return;
-    const [pr, ex, pj, sk, ed] = await Promise.all([
-      supabase.from('profile').select('*').eq('id', 1).maybeSingle(),
-      supabase.from('experiences').select('*').order('sort_order'),
-      supabase.from('projects').select('*').order('sort_order'),
-      supabase.from('skill_groups').select('*').order('sort_order'),
-      supabase.from('education').select('*').order('sort_order'),
+    setLoadError('');
+    const client = supabase;
+    const [pr, ex, pj, sk, ed, ca, te, ce] = await Promise.all([
+      client.from('profile').select('*').eq('id', 1).maybeSingle(),
+      client.from('experiences').select('*').order('sort_order'),
+      client.from('projects').select('*').order('sort_order'),
+      client.from('skill_groups').select('*').order('sort_order'),
+      client.from('education').select('*').order('sort_order'),
+      client.from('project_categories').select('*').order('sort_order'),
+      client.from('technologies').select('*').order('sort_order'),
+      client.from('certificates').select('*').order('sort_order'),
     ]);
+    const error = pr.error || ex.error || pj.error || sk.error || ed.error || ca.error || te.error || ce.error;
+    if (error) {
+      setLoadError(error.message);
+      return;
+    }
     if (pr.data) setProfile({ ...defaultData.profile, ...pr.data });
     setExperiences(ex.data ?? []);
     setProjects(pj.data ?? []);
     setSkills(sk.data ?? []);
     setEducation(ed.data ?? []);
+    setCategories(ca.data ?? []);
+    setTechnologies(te.data ?? []);
+    setCertificates((ce.data ?? []).map((certificate) => ({ ...certificate, issue_date: certificate.issue_date ?? '' })));
   }, []);
 
   useEffect(() => {
     if (!supabase) return;
-    supabase.auth.getSession().then(({ data }) => {
-      if (!data.session) navigate('/admin', { replace: true });
-      else { setReady(true); load(); }
+    const client = supabase;
+    client.auth.getSession().then(async ({ data }) => {
+      if (!data.session || !isAdminEmail(data.session.user.email)) {
+        if (data.session) await client.auth.signOut();
+        navigate('/admin', { replace: true });
+      } else {
+        setReady(true);
+        load();
+      }
     });
   }, [navigate, load]);
 
@@ -113,13 +189,95 @@ export function AdminDashboard() {
   async function saveRow(table: string, row: Record<string, unknown>) {
     if (!supabase) return;
     setSaving(true);
-    const { id, ...values } = row;
-    const query = id == null
-      ? supabase.from(table).insert(values)
-      : supabase.from(table).update(values).eq('id', id);
-    const { error } = await query;
-    setSaving(false);
-    if (error) alert(error.message); else { flash('Saved ✓'); load(); }
+    try {
+      const { id, ...values } = row;
+      if (table === 'skill_groups') values.items_ar = values.items_en;
+      const query = id == null
+        ? supabase.from(table).insert(values)
+        : supabase.from(table).update(values).eq('id', id);
+      const { error } = await query;
+      if (error) throw error;
+
+      if (table === 'skill_groups') {
+        await syncTechnologies();
+      }
+      flash('Saved ✓');
+      await refreshTable(table);
+    } catch (saveError) {
+      alert(errorMessage(saveError));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function syncTechnologies() {
+    if (!supabase) return;
+    const [groupsResult, existingResult] = await Promise.all([
+      supabase
+      .from('skill_groups')
+      .select('items_en,items_ar')
+      .order('sort_order'),
+      supabase.from('technologies').select('id,slug,name'),
+    ]);
+    if (groupsResult.error) throw new Error(`Could not read skills: ${errorMessage(groupsResult.error)}`);
+    if (existingResult.error) throw new Error(`Could not read technologies: ${errorMessage(existingResult.error)}`);
+
+    const names = skillTechnologyNames(groupsResult.data ?? []);
+    const existing = existingResult.data ?? [];
+
+    const matchedIds = new Set<number>();
+    const matchedTechnology = (slug: string, name: string) => (existing ?? []).find((technology) =>
+      technology.slug === slug || technologySlug(technology.name) === technologySlug(name)
+    );
+    for (const name of names) {
+      const current = matchedTechnology(technologySlug(name), name);
+      if (current) matchedIds.add(current.id);
+    }
+
+    const staleIds = (existing ?? [])
+      .map((technology) => technology.id)
+      .filter((id) => !matchedIds.has(id));
+    const records = names.map((name, index) => {
+      const current = matchedTechnology(technologySlug(name), name);
+      return {
+        ...(current ? { id: current.id } : {}),
+        slug: technologySlug(name),
+        name,
+        icon: current ? undefined : '',
+        sort_order: index + 1,
+      };
+    });
+    const operations: PromiseLike<{ error: unknown }>[] = [];
+    if (staleIds.length > 0) operations.push(supabase.from('technologies').delete().in('id', staleIds));
+    if (records.length > 0) operations.push(supabase.from('technologies').upsert(records));
+    const results = await Promise.all(operations);
+    const failed = results.find((result) => result.error);
+    if (failed?.error) throw new Error(`Could not synchronize technologies: ${errorMessage(failed.error)}`);
+  }
+
+  async function refreshTable(table: string) {
+    if (!supabase) return;
+    if (table === 'skill_groups') {
+      const [skillsResult, technologiesResult] = await Promise.all([
+        supabase.from('skill_groups').select('*').order('sort_order'),
+        supabase.from('technologies').select('*').order('sort_order'),
+      ]);
+      if (skillsResult.error) throw skillsResult.error;
+      if (technologiesResult.error) throw technologiesResult.error;
+      setSkills(skillsResult.data ?? []);
+      setTechnologies(technologiesResult.data ?? []);
+      return;
+    }
+    const result = await supabase.from(table).select('*').order('sort_order');
+    if (result.error) throw result.error;
+    if (table === 'experiences') setExperiences(result.data ?? []);
+    if (table === 'projects') setProjects(result.data ?? []);
+    if (table === 'education') setEducation(result.data ?? []);
+    if (table === 'project_categories') setCategories(result.data ?? []);
+    if (table === 'technologies') setTechnologies(result.data ?? []);
+    if (table === 'certificates') {
+      setCertificates((result.data ?? []).map((certificate) => ({ ...certificate, issue_date: certificate.issue_date ?? '' })));
+    }
   }
 
   async function deleteRow(table: string, id: number) {
@@ -149,15 +307,33 @@ export function AdminDashboard() {
   return (
     <div className="admin-page admin-wide">
       <header className="admin-top">
-        <Link to="/" className="admin-back">← Portfolio</Link>
-        <nav>
-          {(['profile', 'experiences', 'projects', 'skills', 'education'] as Tab[]).map((k) => (
-            <button key={k} className={tab === k ? 'is-active' : ''} onClick={() => setTab(k)}>{k}</button>
+        <div className="admin-brand">
+          <Link to="/" className="admin-back">← Portfolio</Link>
+          <span>ADMIN WORKSPACE</span>
+        </div>
+        <nav aria-label="Admin sections">
+          {([
+            ['profile', 'Profile'],
+            ['experiences', 'Experience'],
+            ['projects', 'Projects'],
+            ['skills', 'Skills'],
+            ['education', 'Education'],
+            ['categories', 'Categories'],
+            ['technologies', 'Technologies'],
+            ['certificates', 'Certificates'],
+          ] as [Tab, string][]).map(([key, label]) => (
+            <button key={key} className={tab === key ? 'is-active' : ''} onClick={() => setTab(key)}>{label}</button>
           ))}
         </nav>
         <button className="link-btn" onClick={async () => { await supabase?.auth.signOut(); navigate('/admin'); }}>Sign out</button>
       </header>
       {saved && <div className="admin-saved">{saved}</div>}
+      {loadError && (
+        <div className="admin-error admin-operation-error" role="alert">
+          Could not load dashboard data: {loadError}
+          <button className="link-btn" onClick={() => void load()}>Try again</button>
+        </div>
+      )}
 
       {tab === 'profile' && (
         <section className="admin-section">
@@ -229,10 +405,7 @@ export function AdminDashboard() {
                 <label className="af">
                   <span>Category</span>
                   <select value={row.category} onChange={(e) => set('category')(e.target.value)}>
-                    <option value="fullstack">fullstack</option>
-                    <option value="frontend">frontend</option>
-                    <option value="backend">backend</option>
-                    <option value="other">other</option>
+                    {categories.map((category) => <option key={category.slug} value={category.slug}>{category.name_en}</option>)}
                   </select>
                 </label>
                 <Field label="Tags (comma separated)" value={row.tags.join(', ')} onChange={(v) => set('tags')(v)} />
@@ -246,8 +419,81 @@ export function AdminDashboard() {
               </div>
             </>
           )}
+
           afterSave={(rows) => setProjects(rows)}
           table="projects"
+        />
+      )}
+
+      {tab === 'categories' && (
+        <CollectionEditor<ProjectCategoryOption>
+          title="Project categories"
+          rows={categories}
+          makeNew={() => ({ slug: '', name_en: '', name_ar: '', sort_order: categories.length + 1 })}
+          onSave={(row) => saveRow('project_categories', row as unknown as Record<string, unknown>)}
+          onDelete={(id) => deleteRow('project_categories', id)}
+          render={(row, set) => (
+            <div className="af-grid">
+              <Field label="Slug" value={row.slug} onChange={set('slug')} />
+              <Field label="Name (EN)" value={row.name_en} onChange={set('name_en')} />
+              <Field label="الاسم (عربي)" value={row.name_ar} onChange={set('name_ar')} />
+              <Field label="Sort order" value={String(row.sort_order)} onChange={(v) => set('sort_order')(String(Number(v) || 0))} />
+            </div>
+          )}
+          afterSave={setCategories}
+          table="project_categories"
+        />
+      )}
+
+      {tab === 'technologies' && (
+        <CollectionEditor<Technology>
+          title="Technologies"
+          rows={technologies}
+          makeNew={() => ({ slug: '', name: '', icon: '', sort_order: technologies.length + 1 })}
+          onSave={(row) => saveRow('technologies', row as unknown as Record<string, unknown>)}
+          onDelete={(id) => deleteRow('technologies', id)}
+          render={(row, set) => (
+            <div className="af-grid">
+              <div className="af">
+                <span>Name</span>
+                <strong>{row.name}</strong>
+              </div>
+              <div className="af">
+                <span>Icon</span>
+                <strong>Detected automatically from the technology name</strong>
+              </div>
+              <Field label="Sort order" value={String(row.sort_order)} onChange={(v) => set('sort_order')(String(Number(v) || 0))} />
+            </div>
+          )}
+          afterSave={setTechnologies}
+          table="technologies"
+          allowAdd={false}
+        />
+      )}
+
+      {tab === 'certificates' && (
+        <CollectionEditor<Certificate>
+          title="Certificates"
+          rows={certificates}
+          makeNew={() => ({ title: '', issuer: '', issue_date: '', image_url: '', verification_url: '', is_published: false, sort_order: certificates.length + 1 })}
+          onSave={(row) => saveRow('certificates', row as unknown as Record<string, unknown>)}
+          onDelete={(id) => deleteRow('certificates', id)}
+          render={(row, set) => (
+            <div className="af-grid">
+              <Field label="Title" value={row.title} onChange={set('title')} />
+              <Field label="Issuer" value={row.issuer} onChange={set('issuer')} />
+              <Field label="Issue year" value={row.issue_date} onChange={set('issue_date')} />
+              <ImagePicker value={row.image_url} folder="certificates" onChange={set('image_url')} />
+              <Field label="Verification URL" value={row.verification_url} onChange={set('verification_url')} />
+              <label className="af">
+                <span>Published</span>
+                <input type="checkbox" checked={row.is_published} onChange={(event) => set('is_published')(String(event.target.checked))} />
+              </label>
+              <Field label="Sort order" value={String(row.sort_order)} onChange={(v) => set('sort_order')(String(Number(v) || 0))} />
+            </div>
+          )}
+          afterSave={setCertificates}
+          table="certificates"
         />
       )}
 
@@ -263,7 +509,6 @@ export function AdminDashboard() {
               <Field label="Title (EN)" value={row.title_en} onChange={set('title_en')} />
               <Field label="العنوان (عربي)" value={row.title_ar} onChange={set('title_ar')} />
               <Field label="Items (EN)" value={row.items_en} onChange={set('items_en')} />
-              <Field label="المهارات (عربي)" value={row.items_ar} onChange={set('items_ar')} />
               <Field label="Sort order" value={String(row.sort_order)} onChange={(v) => set('sort_order')(String(Number(v) || 0))} />
             </div>
           )}
@@ -318,6 +563,7 @@ function CollectionEditor<T extends { id?: number; sort_order: number }>(props: 
   onDelete: (id: number) => Promise<void>;
   render: (row: T, set: (key: keyof T) => (v: string) => void) => React.ReactNode;
   afterSave: (rows: T[]) => void;
+  allowAdd?: boolean;
 }) {
   const [editing, setEditing] = useState<T | null>(null);
   const [isNew, setIsNew] = useState(false);
@@ -329,7 +575,7 @@ function CollectionEditor<T extends { id?: number; sort_order: number }>(props: 
     <section className="admin-section">
       <div className="admin-section-head">
         <h2>{props.title}</h2>
-        <button className="text-action" onClick={startNew}>+ Add new</button>
+        {props.allowAdd !== false && <button className="text-action" onClick={startNew}>+ Add new</button>}
       </div>
 
       {editing && (
@@ -337,6 +583,7 @@ function CollectionEditor<T extends { id?: number; sort_order: number }>(props: 
           {props.render(editing, (key) => (v) => {
             let value: unknown = v;
             if (key === 'sort_order') value = Number(v) || 0;
+            if (key === 'is_published') value = v === 'true';
             const arr = (editing as unknown as Record<string, unknown>)[key as string];
             if (Array.isArray(arr)) value = v.split(',').map((s) => s.trim()).filter(Boolean);
             setEditing({ ...editing, [key]: value });
@@ -361,6 +608,7 @@ function CollectionEditor<T extends { id?: number; sort_order: number }>(props: 
           const label =
             (row as unknown as { name?: string }).name ||
             (row as unknown as { company_en?: string }).company_en ||
+            (row as unknown as { title?: string }).title ||
             (row as unknown as { title_en?: string }).title_en ||
             '#' + row.id;
           return (

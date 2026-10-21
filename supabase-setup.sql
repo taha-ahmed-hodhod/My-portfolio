@@ -85,41 +85,145 @@ create table if not exists public.education (
   sort_order int not null default 0
 );
 
--- 6) ROW LEVEL SECURITY: everyone can read, only logged-in admin can write
+-- 6) PROJECT CATEGORIES AND TECHNOLOGIES
+create table if not exists public.project_categories (
+  id bigint generated always as identity primary key,
+  slug text not null unique,
+  name_en text not null default '',
+  name_ar text not null default '',
+  sort_order int not null default 0,
+  created_at timestamptz not null default now()
+);
+
+create table if not exists public.technologies (
+  id bigint generated always as identity primary key,
+  slug text not null unique,
+  name text not null default '',
+  icon text not null default '',
+  sort_order int not null default 0,
+  created_at timestamptz not null default now()
+);
+
+create table if not exists public.certificates (
+  id bigint generated always as identity primary key,
+  title text not null default '',
+  issuer text not null default '',
+  issue_date text not null default '',
+  image_url text not null default '',
+  verification_url text not null default '',
+  is_published boolean not null default false,
+  sort_order int not null default 0,
+  created_at timestamptz not null default now()
+);
+
+-- 6) ROW LEVEL SECURITY: everyone can read, only the single admin can write
 alter table public.profile enable row level security;
 alter table public.experiences enable row level security;
 alter table public.projects enable row level security;
 alter table public.skill_groups enable row level security;
 alter table public.education enable row level security;
+alter table public.project_categories enable row level security;
+alter table public.technologies enable row level security;
+alter table public.certificates enable row level security;
 
 create policy "public read profile" on public.profile for select using (true);
-create policy "admin write profile" on public.profile for all to authenticated using (true) with check (true);
+create policy "single admin write profile" on public.profile for all to authenticated using ((auth.jwt() ->> 'email') = 'tahahodhod650@gmail.com') with check ((auth.jwt() ->> 'email') = 'tahahodhod650@gmail.com');
 
 create policy "public read experiences" on public.experiences for select using (true);
-create policy "admin write experiences" on public.experiences for all to authenticated using (true) with check (true);
+create policy "single admin write experiences" on public.experiences for all to authenticated using ((auth.jwt() ->> 'email') = 'tahahodhod650@gmail.com') with check ((auth.jwt() ->> 'email') = 'tahahodhod650@gmail.com');
 
 create policy "public read projects" on public.projects for select using (true);
-create policy "admin write projects" on public.projects for all to authenticated using (true) with check (true);
+create policy "single admin write projects" on public.projects for all to authenticated using ((auth.jwt() ->> 'email') = 'tahahodhod650@gmail.com') with check ((auth.jwt() ->> 'email') = 'tahahodhod650@gmail.com');
 
 create policy "public read skill_groups" on public.skill_groups for select using (true);
-create policy "admin write skill_groups" on public.skill_groups for all to authenticated using (true) with check (true);
+create policy "single admin write skill_groups" on public.skill_groups for all to authenticated using ((auth.jwt() ->> 'email') = 'tahahodhod650@gmail.com') with check ((auth.jwt() ->> 'email') = 'tahahodhod650@gmail.com');
 
 create policy "public read education" on public.education for select using (true);
-create policy "admin write education" on public.education for all to authenticated using (true) with check (true);
+create policy "single admin write education" on public.education for all to authenticated using ((auth.jwt() ->> 'email') = 'tahahodhod650@gmail.com') with check ((auth.jwt() ->> 'email') = 'tahahodhod650@gmail.com');
+
+create policy "public read project categories" on public.project_categories for select using (true);
+create policy "single admin write project categories" on public.project_categories for all to authenticated using ((auth.jwt() ->> 'email') = 'tahahodhod650@gmail.com') with check ((auth.jwt() ->> 'email') = 'tahahodhod650@gmail.com');
+create policy "public read technologies" on public.technologies for select using (true);
+create policy "single admin write technologies" on public.technologies for all to authenticated using ((auth.jwt() ->> 'email') = 'tahahodhod650@gmail.com') with check ((auth.jwt() ->> 'email') = 'tahahodhod650@gmail.com');
+create policy "public read published certificates" on public.certificates for select using (is_published = true);
+create policy "single admin write certificates" on public.certificates for all to authenticated using ((auth.jwt() ->> 'email') = 'tahahodhod650@gmail.com') with check ((auth.jwt() ->> 'email') = 'tahahodhod650@gmail.com');
+
+insert into public.project_categories (slug, name_en, name_ar, sort_order)
+values
+  ('fullstack', 'Full Stack', 'Full Stack', 1),
+  ('frontend', 'Frontend', 'Frontend', 2),
+  ('backend', 'Backend', 'Backend', 3),
+  ('other', 'Other', 'أخرى', 4)
+on conflict (slug) do nothing;
+
+insert into public.technologies (slug, name, icon, sort_order)
+values
+  ('html5', 'HTML5', 'html5', 1),
+  ('css3', 'CSS3', 'css', 2),
+  ('javascript-es6', 'JavaScript (ES6+)', 'javascript', 3),
+  ('typescript', 'TypeScript', 'typescript', 4),
+  ('react-js', 'React.js', 'react', 5),
+  ('next-js', 'Next.js', 'nextdotjs', 6),
+  ('tailwind-css', 'Tailwind CSS', 'tailwindcss', 7),
+  ('bootstrap', 'Bootstrap', 'bootstrap', 8),
+  ('saas', 'SaaS', '', 9),
+  ('node-js', 'Node.js', 'nodedotjs', 10),
+  ('express-js', 'Express.js', 'express', 11),
+  ('mongodb', 'MongoDB', 'mongodb', 12),
+  ('mongoose', 'Mongoose', 'mongoose', 13),
+  ('supabase', 'Supabase', 'supabase', 14),
+  ('redux-toolkit', 'Redux Toolkit', 'redux', 15),
+  ('git', 'Git', 'git', 16),
+  ('github', 'GitHub', 'github', 17),
+  ('claude-code', 'Claude Code', 'anthropic', 18),
+  ('codex', 'Codex', '', 19),
+  ('antigravity', 'Antigravity', '', 20),
+  ('github-copilot', 'GitHub Copilot', 'githubcopilot', 21),
+  ('opencode', 'OpenCode', '', 22)
+on conflict (slug) do update
+set name = excluded.name,
+    icon = excluded.icon,
+    sort_order = excluded.sort_order;
 
 -- 7) STORAGE bucket for photos (avatar + project covers)
 insert into storage.buckets (id, name, public)
 values ('portfolio', 'portfolio', true)
 on conflict (id) do nothing;
 
+update storage.buckets
+set file_size_limit = 10485760,
+    allowed_mime_types = array['image/jpeg', 'image/png', 'image/webp']::text[]
+where id = 'portfolio';
+
+-- 7b) Realtime publication for public portfolio synchronization
+do $$
+begin
+  alter publication supabase_realtime add table
+    public.profile,
+    public.experiences,
+    public.projects,
+    public.skill_groups,
+    public.education,
+    public.project_categories,
+    public.technologies,
+    public.certificates;
+exception
+  when duplicate_object then null;
+end
+$$;
+
 create policy "public read portfolio files" on storage.objects
   for select using (bucket_id = 'portfolio');
-create policy "admin upload portfolio files" on storage.objects
-  for insert to authenticated with check (bucket_id = 'portfolio');
-create policy "admin update portfolio files" on storage.objects
-  for update to authenticated using (bucket_id = 'portfolio');
-create policy "admin delete portfolio files" on storage.objects
-  for delete to authenticated using (bucket_id = 'portfolio');
+create policy "single admin upload portfolio files" on storage.objects
+  for insert to authenticated
+  with check (bucket_id = 'portfolio' and (auth.jwt() ->> 'email') = 'tahahodhod650@gmail.com');
+create policy "single admin update portfolio files" on storage.objects
+  for update to authenticated
+  using (bucket_id = 'portfolio' and (auth.jwt() ->> 'email') = 'tahahodhod650@gmail.com')
+  with check (bucket_id = 'portfolio' and (auth.jwt() ->> 'email') = 'tahahodhod650@gmail.com');
+create policy "single admin delete portfolio files" on storage.objects
+  for delete to authenticated
+  using (bucket_id = 'portfolio' and (auth.jwt() ->> 'email') = 'tahahodhod650@gmail.com');
 
 -- 8) SEED DATA (Taha's CV)
 insert into public.profile (id, name_en, name_ar, role_en, role_ar, statement_en, statement_ar, intro_en, intro_ar, about_en, about_ar, location_en, location_ar, available_en, available_ar, email, phone, github, linkedin, photo_url, years_label)

@@ -10,3 +10,8 @@ export const supabase: SupabaseClient | null = isSupabaseConfigured
   : null;
 
 export const STORAGE_BUCKET = 'portfolio';
+export const ADMIN_EMAIL = 'tahahodhod650@gmail.com';
+
+export function isAdminEmail(email: string | null | undefined): boolean {
+  return email?.trim().toLowerCase() === ADMIN_EMAIL;
+}

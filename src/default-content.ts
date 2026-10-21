@@ -2,6 +2,31 @@ import type { PortfolioData } from './types';
 
 export const defaultData: PortfolioData = {
   source: 'local',
+  categories: [
+    { slug: 'fullstack', name_en: 'Full-stack', name_ar: 'Full-stack', sort_order: 1 },
+    { slug: 'frontend', name_en: 'Frontend', name_ar: 'Frontend', sort_order: 2 },
+    { slug: 'backend', name_en: 'Backend', name_ar: 'Backend', sort_order: 3 },
+    { slug: 'other', name_en: 'Other', name_ar: 'أخرى', sort_order: 4 },
+  ],
+  technologies: [
+    { slug: 'html5', name: 'HTML5', icon: 'html5', sort_order: 1 },
+    { slug: 'css3', name: 'CSS3', icon: 'css', sort_order: 2 },
+    { slug: 'javascript', name: 'JavaScript', icon: 'javascript', sort_order: 3 },
+    { slug: 'typescript', name: 'TypeScript', icon: 'typescript', sort_order: 4 },
+    { slug: 'react', name: 'React', icon: 'react', sort_order: 5 },
+    { slug: 'next-js', name: 'Next.js', icon: 'nextdotjs', sort_order: 6 },
+    { slug: 'tailwindcss', name: 'Tailwind CSS', icon: 'tailwindcss', sort_order: 7 },
+    { slug: 'bootstrap', name: 'Bootstrap', icon: 'bootstrap', sort_order: 8 },
+    { slug: 'nodejs', name: 'Node.js', icon: 'nodedotjs', sort_order: 9 },
+    { slug: 'express', name: 'Express.js', icon: 'express', sort_order: 10 },
+    { slug: 'mongodb', name: 'MongoDB', icon: 'mongodb', sort_order: 11 },
+    { slug: 'mongoose', name: 'Mongoose', icon: 'mongoose', sort_order: 12 },
+    { slug: 'redux', name: 'Redux Toolkit', icon: 'redux', sort_order: 13 },
+    { slug: 'git', name: 'Git', icon: 'git', sort_order: 14 },
+    { slug: 'github', name: 'GitHub', icon: 'github', sort_order: 15 },
+    { slug: 'supabase', name: 'Supabase', icon: 'supabase', sort_order: 16 },
+  ],
+  certificates: [],
   profile: {
     name_en: 'Taha Ahmed Hodhod',
     name_ar: 'طه أحمد هدهد',

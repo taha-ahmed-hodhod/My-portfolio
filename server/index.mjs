@@ -2,12 +2,11 @@ import { createServer } from 'node:http';
 import { createReadStream, existsSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { handleChat } from './chat-api.mjs';
-
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const dist = path.join(root, 'dist');
 try { process.loadEnvFile(path.join(root, '.env')); }
 catch (error) { if (error?.code !== 'ENOENT') throw error; }
+const { handleChat } = await import('./chat-api.mjs');
 
 const types = {
   '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8',
