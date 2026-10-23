@@ -12,13 +12,21 @@
 }
 :root {
   font-family: Geist, "Noto Sans SC", sans-serif;
-  color: #f3f1f2;
-  background: #0b0b0d;
+  color: #f1f5f9;
+  background: #080d11;
   font-synthesis: none;
-  --ink: #f3f1f2;
-  --muted: rgba(243, 241, 242, 0.64);
-  --line: rgba(243, 241, 242, 0.13);
-  --accent: #e99abd;
+  --ink: #f1f5f9;
+  --muted: rgba(241, 245, 249, 0.65);
+  --line: rgba(45, 212, 191, 0.14);
+  --accent: #14b8a6;
+  --accent-light: #2dd4bf;
+  --accent-dark: #0f766e;
+  --accent-glow: rgba(45, 212, 191, 0.25);
+  --accent-soft: rgba(20, 184, 166, 0.12);
+  --surface: #0e161c;
+  --surface-raised: #131f28;
+  --surface-hover: #192734;
+  --border-subtle: rgba(45, 212, 191, 0.16);
   --ease: cubic-bezier(0.16, 1, 0.3, 1);
   font-variant-numeric: tabular-nums;
 }
@@ -1350,16 +1358,9 @@ section[id] {
   html {
     scroll-behavior: auto;
   }
-  *,
-  *::before,
-  *::after {
-    animation: none !important;
-    transition: none !important;
-  }
-  .project-open:hover .project-visual,
-  .primary-action:hover,
-  .project-open:hover .project-arrow {
-    transform: none;
+  *:not(.marquee-shell):not(.marquee-shell *):not(.marquee-group):not(.marquee-group *) {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
   }
 }
 @media print {

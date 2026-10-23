@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router';
-import type { Locale, PortfolioData, Project, ProjectCategory } from '../types';
+import type { Certificate, Locale, PortfolioData, Project, ProjectCategory } from '../types';
 import { ui } from '../i18n';
 import { Sculpture } from '../Sculpture';
 import { DigitalTwinChat } from '../components/DigitalTwinChat';
 import { findTechnologyIcons, savedTechnologyIconUrl } from '../lib/technology-icons';
+import { supabase } from '../lib/supabase';
 
 function Arrow({ diagonal = false }: { diagonal?: boolean }) {
   return <span aria-hidden="true">{diagonal ? '↗' : '↘'}</span>;
@@ -98,8 +99,24 @@ export function Portfolio({ data, locale, setLocale }: { data: PortfolioData; lo
   const p = data.profile;
   const [category, setCategory] = useState<ProjectCategory | 'all'>('all');
   const [selected, setSelected] = useState<number | null>(null);
+  const [selectedCertificate, setSelectedCertificate] = useState<Certificate | null>(null);
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
   const [notice, setNotice] = useState('');
+
+  // Testimonial submission form state
+  const [feedbackName, setFeedbackName] = useState('');
+  const [feedbackRole, setFeedbackRole] = useState('');
+  const [feedbackCompany, setFeedbackCompany] = useState('');
+  const [feedbackContent, setFeedbackContent] = useState('');
+  const [feedbackRating, setFeedbackRating] = useState(5);
+  const [submittingFeedback, setSubmittingFeedback] = useState(false);
+  const [feedbackStatus, setFeedbackStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+
   const dialog = useRef<HTMLDialogElement>(null);
+  const certDialog = useRef<HTMLDialogElement>(null);
+  const feedbackDialog = useRef<HTMLDialogElement>(null);
+  const marqueeTrackRef = useRef<HTMLDivElement>(null);
+  const isHoveredRef = useRef(false);
   const cvPdfUrl = `${import.meta.env.BASE_URL}Taha_Ahmed_Hodhod_CV.pdf`;
 
   const L = (en: string, ar: string) => (locale === 'ar' ? ar : en);
@@ -114,9 +131,9 @@ export function Portfolio({ data, locale, setLocale }: { data: PortfolioData; lo
   useEffect(() => {
     const target = document.getElementById(window.location.hash.slice(1));
     if (target) requestAnimationFrame(() => target.scrollIntoView({ behavior: 'instant' }));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Project dialog effect
   useEffect(() => {
     const d = dialog.current;
     if (!d) return;
@@ -129,18 +146,131 @@ export function Portfolio({ data, locale, setLocale }: { data: PortfolioData; lo
     }
   }, [selected]);
 
+  // Certificate dialog effect
+  useEffect(() => {
+    const d = certDialog.current;
+    if (!d) return;
+    if (selectedCertificate && !d.open) { d.showModal(); d.scrollTop = 0; }
+    if (!selectedCertificate && d.open) d.close();
+    if (selectedCertificate) {
+      const prev = document.body.style.overflow;
+      document.body.style.overflow = 'hidden';
+      return () => { document.body.style.overflow = prev; };
+    }
+  }, [selectedCertificate]);
+
+  // Feedback dialog effect
+  useEffect(() => {
+    const d = feedbackDialog.current;
+    if (!d) return;
+    if (feedbackOpen && !d.open) { d.showModal(); d.scrollTop = 0; }
+    if (!feedbackOpen && d.open) d.close();
+    if (feedbackOpen) {
+      const prev = document.body.style.overflow;
+      document.body.style.overflow = 'hidden';
+      return () => { document.body.style.overflow = prev; };
+    }
+  }, [feedbackOpen]);
+
   useEffect(() => {
     if (!notice) return;
     const timer = setTimeout(() => setNotice(''), 6000);
     return () => clearTimeout(timer);
   }, [notice]);
 
+  // Continuous infinite marquee animation loop
+  useEffect(() => {
+    const el = marqueeTrackRef.current;
+    if (!el || data.certificates.length === 0) return;
+
+    let offset = 0;
+    let animId: number;
+    let lastTime = performance.now();
+
+    const step = (now: number) => {
+      const delta = Math.min((now - lastTime) / 1000, 0.1);
+      lastTime = now;
+
+      if (!selectedCertificate) {
+        const speed = isHoveredRef.current ? 20 : 50;
+        offset += delta * speed;
+        const halfWidth = el.scrollWidth / 2;
+        if (halfWidth > 0 && offset >= halfWidth) {
+          offset = offset % halfWidth;
+        }
+        el.style.transform = `translate3d(-${offset}px, 0, 0)`;
+      }
+
+      animId = requestAnimationFrame(step);
+    };
+
+    animId = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(animId);
+  }, [data.certificates, selectedCertificate]);
+
   async function copyEmail() {
     try { await navigator.clipboard.writeText(p.email); setNotice(t.copied); }
     catch { setNotice(t.copyFailed); }
   }
 
+  async function handleFeedbackSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!feedbackName.trim() || !feedbackContent.trim()) {
+      setFeedbackStatus({ type: 'error', message: locale === 'ar' ? 'يرجى ملء الحقول المطلوبة' : 'Please fill in required fields.' });
+      return;
+    }
+    if (!supabase) {
+      setFeedbackStatus({ type: 'error', message: locale === 'ar' ? 'الاتصال بقاعدة البيانات غير متوفر حاليًا' : 'Database connection not configured.' });
+      return;
+    }
+    setSubmittingFeedback(true);
+    setFeedbackStatus(null);
+    try {
+      const { error } = await supabase.from('testimonials').insert([{
+        client_name: feedbackName.trim(),
+        client_role: feedbackRole.trim(),
+        client_company: feedbackCompany.trim(),
+        content: feedbackContent.trim(),
+        rating: feedbackRating,
+        status: 'pending',
+      }]);
+      if (error) throw error;
+      setFeedbackStatus({ type: 'success', message: t.testimonialSuccess });
+      setTimeout(() => {
+        setFeedbackOpen(false);
+        setFeedbackStatus(null);
+        setFeedbackName('');
+        setFeedbackRole('');
+        setFeedbackCompany('');
+        setFeedbackContent('');
+        setFeedbackRating(5);
+      }, 2500);
+    } catch (err) {
+      setFeedbackStatus({ type: 'error', message: err instanceof Error ? err.message : t.testimonialError });
+    } finally {
+      setSubmittingFeedback(false);
+    }
+  }
+
   const statement = L(p.statement_en, p.statement_ar).split('\n');
+
+  const s = data.settings || {
+    testimonials_button_visible: true,
+    section_work_visible: true,
+    section_about_visible: true,
+    section_experience_visible: true,
+    section_certificates_visible: true,
+    section_testimonials_visible: true,
+  };
+
+  // Compute navigation links dynamically
+  const navSections = [
+    ...(s.section_work_visible !== false ? [{ id: 'work', label: t.nav[0] }] : []),
+    ...(s.section_experience_visible !== false ? [{ id: 'experience', label: t.nav[1] }] : []),
+    ...(s.section_certificates_visible !== false && data.certificates.length > 0 ? [{ id: 'certificates', label: t.nav[2] }] : []),
+    ...(s.section_testimonials_visible !== false ? [{ id: 'testimonials', label: t.nav[3] }] : []),
+    { id: 'contact', label: t.nav[4] },
+  ];
 
   return (
     <>
@@ -153,8 +283,8 @@ export function Portfolio({ data, locale, setLocale }: { data: PortfolioData; lo
             <span>{name.toUpperCase()}<small>{t.resumeLabel}</small></span>
           </a>
           <nav aria-label="Main navigation">
-            {['work', 'experience', 'contact'].map((id, i) => (
-              <a key={id} href={'#' + id}>{t.nav[i]}<span>0{i + 1}</span></a>
+            {navSections.map((sec, i) => (
+              <a key={sec.id} href={'#' + sec.id}>{sec.label}<span>0{i + 1}</span></a>
             ))}
           </nav>
           <button className="locale-button" aria-label={t.language} onClick={() => setLocale(locale === 'ar' ? 'en' : 'ar')}>
@@ -193,125 +323,263 @@ export function Portfolio({ data, locale, setLocale }: { data: PortfolioData; lo
             </div>
           </section>
 
-          <section className="work-section section-shell" id="work" aria-labelledby="work-title">
-            <div className="section-heading">
-              <div>
-                <p className="section-kicker">01 / SELECTED WORK</p>
-                <h2 id="work-title">{t.selected}<span className="tiny-sup">{String(data.projects.length).padStart(2, '0')}</span></h2>
+          {s.section_work_visible !== false && (
+            <section className="work-section section-shell" id="work" aria-labelledby="work-title">
+              <div className="section-heading">
+                <div>
+                  <p className="section-kicker">01 / SELECTED WORK</p>
+                  <h2 id="work-title">{t.selected}<span className="tiny-sup">{String(data.projects.length).padStart(2, '0')}</span></h2>
+                </div>
+                <p>{t.selectedSub}<br /><span>{t.projectHint}</span></p>
               </div>
-              <p>{t.selectedSub}<br /><span>{t.projectHint}</span></p>
-            </div>
-            <div className="filter-row">
-              <div role="group" aria-label="Project categories">
-                {(['all', ...categories.map((item) => item.slug)] as const).map((k) => {
-                  const option = categories.find((item) => item.slug === k);
-                  const label = k === 'all' ? t.all : (locale === 'ar' ? option?.name_ar : option?.name_en) || k;
-                  return (
-                  <button key={k} onClick={() => setCategory(k)} aria-pressed={category === k}>
-                    {label}{k === 'all' && <span>{String(data.projects.length).padStart(2, '0')}</span>}
-                  </button>
-                  );
-                })}
+              <div className="filter-row">
+                <div role="group" aria-label="Project categories">
+                  {(['all', ...categories.map((item) => item.slug)] as const).map((k) => {
+                    const option = categories.find((item) => item.slug === k);
+                    const label = k === 'all' ? t.all : (locale === 'ar' ? option?.name_ar : option?.name_en) || k;
+                    return (
+                      <button key={k} onClick={() => setCategory(k)} aria-pressed={category === k}>
+                        {label}{k === 'all' && <span>{String(data.projects.length).padStart(2, '0')}</span>}
+                      </button>
+                    );
+                  })}
+                </div>
+                <span role="status" aria-live="polite">{items.length} {t.resultCount}</span>
               </div>
-              <span role="status" aria-live="polite">{items.length} {t.resultCount}</span>
-            </div>
-            <div className={'project-grid ' + (items.length === 1 ? 'single-result' : '')}>
-              {items.map((proj, i) => (
-                <article key={proj.id ?? proj.name} className="project-card">
-                  <button className="project-open" onClick={() => setSelected(proj.id ?? null)} aria-label={proj.name}>
-                    <Cover p={proj} index={i} />
-                    <div className="project-caption">
-                      <div>
-                        <span className="project-number">/{String(i + 1).padStart(2, '0')}</span>
-                        <h3>{proj.name}</h3>
-                        <span className="project-year">{proj.year}</span>
+              <div className={'project-grid ' + (items.length === 1 ? 'single-result' : '')}>
+                {items.map((proj, i) => (
+                  <article key={proj.id ?? proj.name} className="project-card">
+                    <button className="project-open" onClick={() => setSelected(proj.id ?? null)} aria-label={proj.name}>
+                      <Cover p={proj} index={i} />
+                      <div className="project-caption">
+                        <div>
+                          <span className="project-number">/{String(i + 1).padStart(2, '0')}</span>
+                          <h3>{proj.name}</h3>
+                          <span className="project-year">{proj.year}</span>
+                        </div>
+                        <span className="project-arrow"><Arrow diagonal /></span>
                       </div>
-                      <span className="project-arrow"><Arrow diagonal /></span>
-                    </div>
-                    <p className="project-headline">{L(proj.headline_en, proj.headline_ar)}</p>
-                    <div className="project-tags">{proj.tags.map((tag) => <span key={tag}>{tag}</span>)}</div>
-                  </button>
-                </article>
-              ))}
-            </div>
-          </section>
-
-          <section className="about-section section-shell" aria-labelledby="about-title">
-            <div className="about-left">
-              <p className="section-kicker">02 / {t.aboutLabel.toUpperCase()}</p>
-              <h2 id="about-title">{t.aboutTitle[0]}<br /><span>{t.aboutTitle[1]}</span></h2>
-              <p className="about-body">{L(p.about_en, p.about_ar)}</p>
-              <div className="about-stamp" aria-hidden="true"><span>THINK</span><b>✳</b><span>MAKE</span></div>
-            </div>
-            <Sculpture labels={{
-              sculpture: t.sculpture, hint: t.sculptureHint, pause: t.pause, play: t.play,
-              paused: t.pause, running: t.play, reduced: t.pause, reset: '↺', specimen: 'FORM STUDY 001',
-            }} />
-          </section>
-
-          <section className="experience-section section-shell" id="experience" aria-labelledby="experience-title">
-            <div className="section-heading">
-              <div>
-                <p className="section-kicker">03 / THE JOURNEY</p>
-                <h2 id="experience-title">{t.experience}</h2>
-              </div>
-              <p>{t.experienceNote}</p>
-            </div>
-            <div className="experience-list">
-              {data.experiences.map((h, i) => (
-                <article key={h.id ?? i}>
-                  <div className="experience-date"><span>{L(h.date_en, h.date_ar)}</span>{i === 0 && <i />}</div>
-                  <div><h3>{L(h.company_en, h.company_ar)}</h3><p className="experience-role">{L(h.role_en, h.role_ar)}</p></div>
-                  <p>{L(h.body_en, h.body_ar)}</p>
-                </article>
-              ))}
-            </div>
-            <div className="toolkit">
-              <div><h3>{t.toolkit}</h3><p>{t.toolNote}</p></div>
-              <div className="skill-list">
-                {data.skills.map((g) => (
-                  <div key={g.id ?? g.title_en}>
-                    <h4>{L(g.title_en, g.title_ar)}</h4>
-                    <div className="technology-list">
-                      {L(g.items_en, g.items_ar).split(/[·,]/).map((name) => name.trim()).filter(Boolean).map((name) => {
-                        const technology = findTechnology(name, data.technologies);
-                        return (
-                          <span className="technology-chip" key={name}>
-                            {technology && <TechnologyIcon technology={technology} />}
-                            <span>{name}</span>
-                          </span>
-                        );
-                      })}
-                    </div>
-                  </div>
+                      <p className="project-headline">{L(proj.headline_en, proj.headline_ar)}</p>
+                      <div className="project-tags">{proj.tags.map((tag) => <span key={tag}>{tag}</span>)}</div>
+                    </button>
+                  </article>
                 ))}
               </div>
-            </div>
-            <div className="education">
-              <h3>{t.education}</h3>
-              <div className="education-grid">
-                {degrees.length > 0 && (
-                  <div>
-                    <h4>{t.degrees}</h4>
-                    {degrees.map((e) => (
-                      <p key={e.id ?? e.title_en}><b>{L(e.title_en, e.title_ar)}</b> — {L(e.org_en, e.org_ar)}<br /><span>{L(e.date_en, e.date_ar)} · {L(e.details_en, e.details_ar)}</span></p>
-                    ))}
-                  </div>
-                )}
-                {courses.length > 0 && (
-                  <div>
-                    <h4>{t.courses}</h4>
-                    {courses.map((e) => (
-                      <p key={e.id ?? e.title_en}><b>{L(e.title_en, e.title_ar)}</b> — {L(e.org_en, e.org_ar)}<br /><span>{L(e.date_en, e.date_ar)} · {L(e.details_en, e.details_ar)}</span></p>
-                    ))}
-                  </div>
-                )}
+            </section>
+          )}
+
+          {s.section_about_visible !== false && (
+            <section className="about-section section-shell" aria-labelledby="about-title">
+              <div className="about-left">
+                <p className="section-kicker">02 / {t.aboutLabel.toUpperCase()}</p>
+                <h2 id="about-title">{t.aboutTitle[0]}<br /><span>{t.aboutTitle[1]}</span></h2>
+                <p className="about-body">{L(p.about_en, p.about_ar)}</p>
+                <div className="about-stamp" aria-hidden="true"><span>THINK</span><b>✳</b><span>MAKE</span></div>
               </div>
-            </div>
-          </section>
+              <Sculpture labels={{
+                sculpture: t.sculpture, hint: t.sculptureHint, pause: t.pause, play: t.play,
+                paused: t.pause, running: t.play, reduced: t.pause, reset: '↺', specimen: 'FORM STUDY 001',
+              }} />
+            </section>
+          )}
+
+          {s.section_experience_visible !== false && (
+            <section className="experience-section section-shell" id="experience" aria-labelledby="experience-title">
+              <div className="section-heading">
+                <div>
+                  <p className="section-kicker">03 / THE JOURNEY</p>
+                  <h2 id="experience-title">{t.experience}</h2>
+                </div>
+                <p>{t.experienceNote}</p>
+              </div>
+              <div className="experience-list">
+                {data.experiences.map((h, i) => (
+                  <article key={h.id ?? i}>
+                    <div className="experience-date"><span>{L(h.date_en, h.date_ar)}</span>{i === 0 && <i />}</div>
+                    <div><h3>{L(h.company_en, h.company_ar)}</h3><p className="experience-role">{L(h.role_en, h.role_ar)}</p></div>
+                    <p>{L(h.body_en, h.body_ar)}</p>
+                  </article>
+                ))}
+              </div>
+              <div className="toolkit">
+                <div><h3>{t.toolkit}</h3><p>{t.toolNote}</p></div>
+                <div className="skill-list">
+                  {data.skills.map((g) => (
+                    <div key={g.id ?? g.title_en}>
+                      <h4>{L(g.title_en, g.title_ar)}</h4>
+                      <div className="technology-list">
+                        {L(g.items_en, g.items_ar).split(/[·,]/).map((item) => item.trim()).filter(Boolean).map((techName) => {
+                          const technology = findTechnology(techName, data.technologies);
+                          return (
+                            <span className="technology-chip" key={techName}>
+                              {technology && <TechnologyIcon technology={technology} />}
+                              <span>{techName}</span>
+                            </span>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="education">
+                <h3>{t.education}</h3>
+                <div className="education-grid">
+                  {degrees.length > 0 && (
+                    <div>
+                      <h4>{t.degrees}</h4>
+                      {degrees.map((e) => (
+                        <p key={e.id ?? e.title_en}><b>{L(e.title_en, e.title_ar)}</b> — {L(e.org_en, e.org_ar)}<br /><span>{L(e.date_en, e.date_ar)} · {L(e.details_en, e.details_ar)}</span></p>
+                      ))}
+                    </div>
+                  )}
+                  {courses.length > 0 && (
+                    <div>
+                      <h4>{t.courses}</h4>
+                      {courses.map((e) => (
+                        <p key={e.id ?? e.title_en}><b>{L(e.title_en, e.title_ar)}</b> — {L(e.org_en, e.org_ar)}<br /><span>{L(e.date_en, e.date_ar)} · {L(e.details_en, e.details_ar)}</span></p>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </section>
+          )}
+
+          {s.section_certificates_visible !== false && data.certificates.length > 0 && (
+            <section className="certificates-section section-shell" id="certificates" aria-labelledby="certificates-title">
+              <div className="section-heading">
+                <div>
+                  <p className="section-kicker">04 / CREDENTIALS</p>
+                  <h2 id="certificates-title">{t.certificatesTitle}<span className="tiny-sup">{String(data.certificates.length).padStart(2, '0')}</span></h2>
+                </div>
+                <p>{t.certificatesSub}</p>
+              </div>
+              <div
+                className="marquee-shell"
+                onMouseEnter={() => { isHoveredRef.current = true; }}
+                onMouseLeave={() => { isHoveredRef.current = false; }}
+              >
+                <div ref={marqueeTrackRef} className="marquee-js-track">
+                  <div className="marquee-group">
+                    {[...data.certificates, ...data.certificates, ...data.certificates, ...data.certificates].map((cert, idx) => (
+                      <button
+                        key={`g1-${cert.id ?? cert.title}-${idx}`}
+                        className="certificate-card"
+                        onClick={() => setSelectedCertificate(cert)}
+                        aria-label={`${cert.title} - ${cert.issuer}`}
+                      >
+                        <div className="cert-card-img">
+                          {cert.image_url ? (
+                            <img src={cert.image_url} alt="" loading="lazy" />
+                          ) : (
+                            <div className="cert-card-placeholder">
+                              <span>🎓</span>
+                            </div>
+                          )}
+                        </div>
+                        <div className="cert-card-info">
+                          <span className="cert-issuer">{cert.issuer}</span>
+                          <h3 className="cert-title">{cert.title}</h3>
+                          {cert.issue_date && <span className="cert-date">{cert.issue_date}</span>}
+                        </div>
+                        <span className="cert-open-hint">{t.viewCertificate} ↗</span>
+                      </button>
+                    ))}
+                  </div>
+                  <div className="marquee-group" aria-hidden="true">
+                    {[...data.certificates, ...data.certificates, ...data.certificates, ...data.certificates].map((cert, idx) => (
+                      <button
+                        key={`g2-${cert.id ?? cert.title}-${idx}`}
+                        className="certificate-card"
+                        onClick={() => setSelectedCertificate(cert)}
+                        tabIndex={-1}
+                      >
+                        <div className="cert-card-img">
+                          {cert.image_url ? (
+                            <img src={cert.image_url} alt="" loading="lazy" />
+                          ) : (
+                            <div className="cert-card-placeholder">
+                              <span>🎓</span>
+                            </div>
+                          )}
+                        </div>
+                        <div className="cert-card-info">
+                          <span className="cert-issuer">{cert.issuer}</span>
+                          <h3 className="cert-title">{cert.title}</h3>
+                          {cert.issue_date && <span className="cert-date">{cert.issue_date}</span>}
+                        </div>
+                        <span className="cert-open-hint">{t.viewCertificate} ↗</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </section>
+          )}
+
+          {s.section_testimonials_visible !== false && (
+            <section className="testimonials-section section-shell" id="testimonials" aria-labelledby="testimonials-title">
+              <div className="section-heading">
+                <div>
+                  <p className="section-kicker">05 / CLIENT FEEDBACK</p>
+                  <h2 id="testimonials-title">{t.testimonialsTitle}<span className="tiny-sup">{String(data.testimonials.length).padStart(2, '0')}</span></h2>
+                </div>
+                <div className="testimonials-heading-action">
+                  <p>{t.testimonialsSub}</p>
+                  {s.testimonials_button_visible !== false && (
+                    <button className="primary-action share-btn" onClick={() => setFeedbackOpen(true)}>
+                      <span aria-hidden="true">✳</span> {t.shareFeedback}
+                    </button>
+                  )}
+                </div>
+              </div>
+              {data.testimonials.length > 0 ? (
+                <div className="testimonials-grid">
+                  {data.testimonials.map((item) => (
+                    <article key={item.id ?? item.client_name} className="testimonial-card">
+                      <div className="testimonial-stars" aria-label={`${item.rating || 5} out of 5 stars`}>
+                        {Array.from({ length: item.rating || 5 }).map((_, i) => (
+                          <span key={i} className="star-icon" aria-hidden="true">★</span>
+                        ))}
+                      </div>
+                      <p className="testimonial-content">“{item.content}”</p>
+                      <div className="testimonial-author">
+                        <div className="testimonial-avatar" aria-hidden="true">
+                          {item.avatar_url ? (
+                            <img src={item.avatar_url} alt="" loading="lazy" />
+                          ) : (
+                            <span>{item.client_name.slice(0, 2).toUpperCase()}</span>
+                          )}
+                        </div>
+                        <div className="testimonial-meta">
+                          <h3 className="testimonial-name">{item.client_name}</h3>
+                          {(item.client_role || item.client_company) && (
+                            <p className="testimonial-role">
+                              {[item.client_role, item.client_company].filter(Boolean).join(' · ')}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              ) : (
+                <div className="testimonials-empty">
+                  <p>{t.noTestimonials}</p>
+                  {s.testimonials_button_visible !== false && (
+                    <button className="text-action" onClick={() => setFeedbackOpen(true)}>
+                      {t.shareFeedback} ↗
+                    </button>
+                  )}
+                </div>
+              )}
+            </section>
+          )}
+
 
           <section className="contact-section section-shell" id="contact" aria-labelledby="contact-title">
-            <p className="section-kicker">04 / WHAT'S NEXT?</p>
+            <p className="section-kicker">{s.section_testimonials_visible !== false ? '06' : '05'} / WHAT'S NEXT?</p>
             <div className="contact-layout">
               <div>
                 <h2 id="contact-title">{t.contactTitle[0]}<br /><span>{t.contactTitle[1]}</span><span className="contact-star" aria-hidden="true">✳</span></h2>
@@ -369,6 +637,7 @@ export function Portfolio({ data, locale, setLocale }: { data: PortfolioData; lo
         {data.education.map((e, i) => <p key={i}>{L(e.title_en, e.title_ar)} — {L(e.org_en, e.org_ar)} ({L(e.date_en, e.date_ar)})</p>)}
       </section>
 
+      {/* Project Details Dialog — Main Image FIRST */}
       <dialog
         ref={dialog}
         className="case-dialog"
@@ -388,19 +657,209 @@ export function Portfolio({ data, locale, setLocale }: { data: PortfolioData; lo
               <button autoFocus aria-label={t.close} onClick={() => setSelected(null)}>×</button>
             </div>
             <div className="dialog-content">
-              <p className="section-kicker">{project.name}</p>
-              <h2>{L(project.headline_en, project.headline_ar)}</h2>
-              <p className="case-context">{L(project.summary_en, project.summary_ar)}</p>
-              <div className="project-tags dialog-tags">{project.tags.map((tag) => <span key={tag}>{tag}</span>)}</div>
-              <div className="dialog-links">
-                {project.demo_url && <a className="primary-action" href={project.demo_url} target="_blank" rel="noreferrer">{t.viewDemo}<span aria-hidden="true">↗</span></a>}
-                {project.code_url && <a className="text-action" href={project.code_url} target="_blank" rel="noreferrer">{t.viewCode} ↗</a>}
+              {/* 1. Main Project Image FIRST */}
+              {project.image_url ? (
+                <div className="dialog-hero-frame">
+                  <img className="dialog-image" src={project.image_url} alt={project.name} />
+                </div>
+              ) : (
+                <div className="dialog-hero-frame dialog-fallback-frame">
+                  <span className="dialog-fallback-title">{project.name}</span>
+                </div>
+              )}
+
+              {/* 2. Project Title and Concise Overview */}
+              <div className="dialog-meta-heading">
+                <p className="section-kicker">{project.name}</p>
+                <h2>{L(project.headline_en, project.headline_ar)}</h2>
               </div>
-              {project.image_url && <img className="dialog-image" src={project.image_url} alt={project.name} />}
-              <button className="text-action" onClick={() => setSelected(null)}>{t.close} ↙</button>
+
+              {/* 3. Description and Summary */}
+              <p className="case-context">{L(project.summary_en, project.summary_ar)}</p>
+
+              {/* 4. Technologies and Technology Icons */}
+              {project.tags.length > 0 && (
+                <div className="dialog-tech-section">
+                  <span className="dialog-sublabel">{locale === 'ar' ? 'التقنيات المستخدمة:' : 'Technologies:'}</span>
+                  <div className="technology-list">
+                    {project.tags.map((tag) => {
+                      const tech = findTechnology(tag, data.technologies);
+                      return (
+                        <span className="technology-chip" key={tag}>
+                          {tech && <TechnologyIcon technology={tech} />}
+                          <span>{tag}</span>
+                        </span>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* 5. Live Demo and Code Links */}
+              <div className="dialog-links">
+                {project.demo_url && (
+                  <a className="primary-action" href={project.demo_url} target="_blank" rel="noreferrer">
+                    {t.viewDemo}<span aria-hidden="true">↗</span>
+                  </a>
+                )}
+                {project.code_url && (
+                  <a className="text-action" href={project.code_url} target="_blank" rel="noreferrer">
+                    {t.viewCode} ↗
+                  </a>
+                )}
+                <button className="text-action dialog-close-btn" onClick={() => setSelected(null)}>
+                  {t.close} ↙
+                </button>
+              </div>
             </div>
           </>
         )}
+      </dialog>
+
+      {/* Certificate Details Dialog */}
+      <dialog
+        ref={certDialog}
+        className="case-dialog cert-dialog"
+        onCancel={() => setSelectedCertificate(null)}
+        onClose={() => setSelectedCertificate(null)}
+        onClick={(e) => {
+          if (e.target === e.currentTarget) {
+            const r = e.currentTarget.getBoundingClientRect();
+            if (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom) setSelectedCertificate(null);
+          }
+        }}
+      >
+        {selectedCertificate && (
+          <>
+            <div className="dialog-top">
+              <span>{selectedCertificate.issuer} · {selectedCertificate.issue_date || 'Certified'}</span>
+              <button autoFocus aria-label={t.close} onClick={() => setSelectedCertificate(null)}>×</button>
+            </div>
+            <div className="dialog-content">
+              {selectedCertificate.image_url ? (
+                <div className="dialog-hero-frame cert-hero-frame">
+                  <img className="dialog-image" src={selectedCertificate.image_url} alt={selectedCertificate.title} />
+                </div>
+              ) : (
+                <div className="dialog-hero-frame cert-fallback-frame">
+                  <span className="cert-emoji">🎓</span>
+                </div>
+              )}
+              <div className="dialog-meta-heading">
+                <p className="section-kicker">{selectedCertificate.issuer}</p>
+                <h2>{selectedCertificate.title}</h2>
+                {selectedCertificate.issue_date && (
+                  <p className="cert-date-line">{t.issueDate}: <strong>{selectedCertificate.issue_date}</strong></p>
+                )}
+              </div>
+              <div className="dialog-links">
+                {selectedCertificate.verification_url ? (
+                  <a className="primary-action" href={selectedCertificate.verification_url} target="_blank" rel="noreferrer">
+                    {t.verifyCredential} <span aria-hidden="true">↗</span>
+                  </a>
+                ) : null}
+                <button className="text-action" onClick={() => setSelectedCertificate(null)}>
+                  {t.close} ↙
+                </button>
+              </div>
+            </div>
+          </>
+        )}
+      </dialog>
+
+      {/* Testimonial Feedback Modal */}
+      <dialog
+        ref={feedbackDialog}
+        className="case-dialog feedback-dialog"
+        onCancel={() => setFeedbackOpen(false)}
+        onClose={() => setFeedbackOpen(false)}
+        onClick={(e) => {
+          if (e.target === e.currentTarget) {
+            const r = e.currentTarget.getBoundingClientRect();
+            if (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom) setFeedbackOpen(false);
+          }
+        }}
+      >
+        <div className="dialog-top">
+          <span>{t.testimonialsTitle}</span>
+          <button autoFocus aria-label={t.close} onClick={() => setFeedbackOpen(false)}>×</button>
+        </div>
+        <div className="dialog-content">
+          <div className="dialog-meta-heading">
+            <h2>{t.testimonialFormTitle}</h2>
+            <p className="case-context">{t.testimonialFormDesc}</p>
+          </div>
+
+          {feedbackStatus && (
+            <div className={`feedback-alert ${feedbackStatus.type === 'success' ? 'alert-success' : 'alert-error'}`} role="alert">
+              {feedbackStatus.message}
+            </div>
+          )}
+
+          <form className="feedback-form" onSubmit={handleFeedbackSubmit}>
+            <label className="af">
+              <span>{t.nameField}</span>
+              <input
+                required
+                value={feedbackName}
+                onChange={(e) => setFeedbackName(e.target.value)}
+                placeholder={locale === 'ar' ? 'مثال: محمد علي' : 'e.g. Alex Morgan'}
+              />
+            </label>
+            <div className="form-duo">
+              <label className="af">
+                <span>{t.roleField}</span>
+                <input
+                  value={feedbackRole}
+                  onChange={(e) => setFeedbackRole(e.target.value)}
+                  placeholder={locale === 'ar' ? 'مثال: مدير تقني' : 'e.g. Engineering Lead'}
+                />
+              </label>
+              <label className="af">
+                <span>{t.companyField}</span>
+                <input
+                  value={feedbackCompany}
+                  onChange={(e) => setFeedbackCompany(e.target.value)}
+                  placeholder={locale === 'ar' ? 'مثال: شركة التقنية' : 'e.g. TechCorp'}
+                />
+              </label>
+            </div>
+            <label className="af">
+              <span>{t.ratingField}</span>
+              <div className="rating-selector" role="radiogroup" aria-label="Rating">
+                {[1, 2, 3, 4, 5].map((star) => (
+                  <button
+                    key={star}
+                    type="button"
+                    className={`star-select-btn ${star <= feedbackRating ? 'is-selected' : ''}`}
+                    onClick={() => setFeedbackRating(star)}
+                    aria-label={`${star} Stars`}
+                  >
+                    ★
+                  </button>
+                ))}
+              </div>
+            </label>
+            <label className="af">
+              <span>{t.feedbackField}</span>
+              <textarea
+                required
+                rows={4}
+                value={feedbackContent}
+                onChange={(e) => setFeedbackContent(e.target.value)}
+                placeholder={locale === 'ar' ? 'اكتب رأيك وتجربتك في العمل مع طه...' : 'Write your honest feedback about collaborating with Taha...'}
+              />
+            </label>
+            <div className="form-actions">
+              <button type="submit" className="primary-action" disabled={submittingFeedback}>
+                {submittingFeedback ? t.submittingFeedback : t.submitFeedback} <span aria-hidden="true">↗</span>
+              </button>
+              <button type="button" className="text-action" onClick={() => setFeedbackOpen(false)}>
+                {t.close}
+              </button>
+            </div>
+          </form>
+        </div>
       </dialog>
 
       <div className={'toast ' + (notice ? 'is-visible' : '')} role="status" aria-live="polite">{notice}</div>

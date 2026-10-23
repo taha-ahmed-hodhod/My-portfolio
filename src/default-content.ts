@@ -27,6 +27,16 @@ export const defaultData: PortfolioData = {
     { slug: 'supabase', name: 'Supabase', icon: 'supabase', sort_order: 16 },
   ],
   certificates: [],
+  testimonials: [],
+  testimonialsVisible: true,
+  settings: {
+    testimonials_button_visible: true,
+    section_work_visible: true,
+    section_about_visible: true,
+    section_experience_visible: true,
+    section_certificates_visible: true,
+    section_testimonials_visible: true,
+  },
   profile: {
     name_en: 'Taha Ahmed Hodhod',
     name_ar: 'طه أحمد هدهد',

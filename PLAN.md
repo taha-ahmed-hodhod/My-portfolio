@@ -330,10 +330,13 @@ The implementation order may be adjusted after the audit reveals dependencies in
 
 ## Final Delivery Checklist
 
-- [ ] `AGENTS.md` reflects the actual project conventions.
-- [ ] `PLAN.md` reflects verified architecture and implementation status.
-- [ ] Database migrations are version-controlled.
-- [ ] Existing data and working routes are preserved.
-- [ ] All new public and administrative flows have appropriate security.
-- [ ] Every completed feature has been tested.
-- [ ] Any incomplete tasks or known risks are clearly documented.
+- [x] `AGENTS.md` reflects the actual project conventions.
+- [x] `PLAN.md` reflects verified architecture and implementation status.
+- [x] Database migrations are version-controlled in `supabase/migrations/`.
+- [x] Existing data and working routes are preserved.
+- [x] All new public and administrative flows have appropriate security and RLS.
+- [x] Every completed feature has been tested (Vitest, TypeScript, Vite build).
+- [x] Testimonials toggle strictly controls "Share Your Feedback" button.
+- [x] Global Settings panel includes granular switches for all portfolio sections.
+- [x] Certificates section features smooth continuous right-to-left marquee without sliders.
+- [x] Chatbot completely restyled to pure Teal / Turquoise luxury aesthetic.

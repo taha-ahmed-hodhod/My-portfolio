@@ -82,6 +82,27 @@ export interface Certificate {
   sort_order: number;
 }
 
+export interface Testimonial {
+  id?: number;
+  client_name: string;
+  client_role: string;
+  client_company: string;
+  content: string;
+  rating: number;
+  avatar_url: string;
+  status: 'pending' | 'approved' | 'rejected';
+  created_at?: string;
+}
+
+export interface SiteSettings {
+  testimonials_button_visible: boolean;
+  section_work_visible: boolean;
+  section_about_visible: boolean;
+  section_experience_visible: boolean;
+  section_certificates_visible: boolean;
+  section_testimonials_visible: boolean;
+}
+
 export interface PortfolioData {
   profile: Profile;
   experiences: Experience[];
@@ -91,5 +112,8 @@ export interface PortfolioData {
   categories: ProjectCategoryOption[];
   technologies: Technology[];
   certificates: Certificate[];
+  testimonials: Testimonial[];
+  testimonialsVisible: boolean;
+  settings: SiteSettings;
   source: 'remote' | 'local';
 }
