@@ -530,7 +530,18 @@ export function Portfolio({ data, locale, setLocale }: { data: PortfolioData; lo
                             <span className="project-arrow"><Arrow diagonal /></span>
                           </div>
                           <p className="project-headline">{L(proj.headline_en, proj.headline_ar)}</p>
-                          <div className="project-tags">{proj.tags.map((tag) => <span key={tag}>{tag}</span>)}</div>
+                          <div className="project-tags">
+                            {proj.tags.map((tag) => {
+                              const tech = findTechnology(tag, data.technologies)
+                                || { name: tag, icon: '', slug: technologySlug(tag) };
+                              return (
+                                <span className="technology-chip" key={tag}>
+                                  <TechnologyIcon technology={tech} />
+                                  <span>{tag}</span>
+                                </span>
+                              );
+                            })}
+                          </div>
                         </button>
                       </article>
                     );

@@ -15,15 +15,17 @@ export async function getPortfolioContext() {
   const client = getClient();
   if (!client) throw new Error('SUPABASE_NOT_CONFIGURED');
 
-  const [profile, experiences, projects, skills, education] = await Promise.all([
+  const [profile, experiences, projects, skills, education, certificates, testimonials] = await Promise.all([
     client.from('profile').select('name_en,name_ar,role_en,role_ar,intro_en,intro_ar,about_en,about_ar'),
     client.from('experiences').select('date_en,date_ar,company_en,company_ar,role_en,role_ar,body_en,body_ar').order('sort_order'),
-    client.from('projects').select('name,year,category,headline_en,headline_ar,summary_en,summary_ar,tags,demo_url,code_url').order('sort_order'),
+    client.from('projects').select('name,year,category,headline_en,headline_ar,summary_en,summary_ar,problem,solution,role,tags,demo_url,code_url').order('sort_order'),
     client.from('skill_groups').select('title_en,title_ar,items_en,items_ar').order('sort_order'),
     client.from('education').select('kind,title_en,title_ar,org_en,org_ar,date_en,date_ar,details_en,details_ar').order('sort_order'),
+    client.from('certificates').select('title,issuer,issue_date,issue_year,credential_url,published').order('sort_order'),
+    client.from('testimonials').select('client_name,client_role,client_company,content,rating,status').eq('status', 'approved').order('sort_order'),
   ]);
 
-  const error = profile.error || experiences.error || projects.error || skills.error || education.error;
+  const error = profile.error || experiences.error || projects.error || skills.error || education.error || certificates.error || testimonials.error;
   if (error) throw error;
   if (!profile.data) throw new Error('PROFILE_NOT_FOUND');
 
@@ -43,12 +45,33 @@ export async function getPortfolioContext() {
   lines.push('\nProjects:');
   for (const item of projects.data ?? []) {
     const tags = Array.isArray(item.tags) ? item.tags.filter((tag) => typeof tag === 'string').join(', ') : '';
-    lines.push(`- ${text(item.name)} (${text(item.year)}, ${text(item.category)}). ${text(item.headline_en)} ${text(item.headline_ar)}. ${text(item.summary_en)} ${text(item.summary_ar)}. Technologies: ${tags}.`);
+    const extra = [
+      item.role ? `Role: ${text(item.role)}` : '',
+      item.problem ? `Challenge: ${text(item.problem)}` : '',
+      item.solution ? `Solution: ${text(item.solution)}` : '',
+    ].filter(Boolean).join('. ');
+    lines.push(`- ${text(item.name)} (${text(item.year)}, ${text(item.category)}). ${text(item.headline_en)} ${text(item.headline_ar)}. ${text(item.summary_en)} ${text(item.summary_ar)}. Technologies: ${tags}.${extra ? ` ${extra}.` : ''}`);
   }
 
-  lines.push('\nSkills:');
+  lines.push('\nSkills & Technical Toolkit:');
   for (const item of skills.data ?? []) {
     lines.push(`- ${text(item.title_en)} / ${text(item.title_ar)}: ${text(item.items_en)} / ${text(item.items_ar)}`);
+  }
+
+  lines.push('\nCertificates & Credentials:');
+  for (const cert of certificates.data ?? []) {
+    if (cert.published !== false) {
+      const year = cert.issue_year || cert.issue_date || '';
+      const cred = cert.credential_url ? ` (Verification: ${cert.credential_url})` : '';
+      lines.push(`- ${text(cert.title)} issued by ${text(cert.issuer)} ${year ? `(${year})` : ''}${cred}`);
+    }
+  }
+
+  lines.push('\nClient Testimonials & Feedback:');
+  for (const rev of testimonials.data ?? []) {
+    const roleComp = [text(rev.client_role), text(rev.client_company)].filter(Boolean).join(' at ');
+    const rating = rev.rating ? `[${rev.rating}/5 stars]` : '';
+    lines.push(`- ${text(rev.client_name)}${roleComp ? ` (${roleComp})` : ''}: "${text(rev.content)}" ${rating}`);
   }
 
   lines.push('\nEducation:');
