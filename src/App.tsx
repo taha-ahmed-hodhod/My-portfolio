@@ -3,7 +3,7 @@ import { HashRouter, Routes, Route } from 'react-router';
 import type { Locale } from './types';
 import { ui } from './i18n';
 import { usePortfolio } from './lib/data';
-import { LoadingScreen } from './components/LoadingScreen';
+import { PortfolioSkeleton } from './components/PortfolioSkeleton';
 import { Portfolio } from './pages/Portfolio';
 import { AdminLogin } from './pages/AdminLogin';
 import { AdminDashboard } from './pages/AdminDashboard';
@@ -11,7 +11,7 @@ import { AdminDashboard } from './pages/AdminDashboard';
 function Site() {
   const { data } = usePortfolio();
   const [locale, setLocale] = useState<Locale>('en');
-  const [loaded, setLoaded] = useState(false);
+  const [revealed, setRevealed] = useState(false);
 
   useEffect(() => {
     document.documentElement.lang = locale === 'ar' ? 'ar' : 'en';
@@ -22,18 +22,22 @@ function Site() {
     document.querySelector('meta[name="description"]')?.setAttribute('content', role);
   }, [locale, data]);
 
+  useEffect(() => {
+    if (data) {
+      const timer = setTimeout(() => {
+        setRevealed(true);
+      }, 150);
+      return () => clearTimeout(timer);
+    }
+  }, [data]);
+
   return (
     <>
-      {!loaded && (
-        <LoadingScreen
-          done={!!data}
-          name="TAHA HODHOD"
-          tagline={ui[locale].loadingTag}
-          onFinish={() => setLoaded(true)}
-        />
+      {(!data || !revealed) && (
+        <PortfolioSkeleton locale={locale} />
       )}
       {data && (
-        <div className={loaded ? 'site-reveal is-in' : 'site-reveal'}>
+        <div className={`site-reveal ${revealed ? 'is-in' : ''}`}>
           <Portfolio data={data} locale={locale} setLocale={setLocale} />
         </div>
       )}

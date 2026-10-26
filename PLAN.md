@@ -340,3 +340,9 @@ The implementation order may be adjusted after the audit reveals dependencies in
 - [x] Global Settings panel includes granular switches for all portfolio sections.
 - [x] Certificates section features smooth continuous right-to-left marquee without sliders.
 - [x] Chatbot completely restyled to pure Teal / Turquoise luxury aesthetic.
+- [x] Administrative Dashboard completely redesigned into luxury Bento architecture (`ui-ux-pro-max`).
+- [x] Pinned sticky sidebar with grouped clusters, live counters, and mobile drawer.
+- [x] Topbar with OS-aware shortcut (`⌘K` / `Ctrl+K`), live search filter, and reviews notifications popover.
+- [x] Real monthly telemetry growth chart built with `Chart.js` canvas and Supabase timestamps.
+- [x] Decoupled Admin i18n dictionary (`src/adminI18n.ts`) with runtime Arabic / English switching and RTL/LTR support.
+- [x] Full accessibility with keyboard focus rings, Escape key modal dismiss, and reduced-motion support.

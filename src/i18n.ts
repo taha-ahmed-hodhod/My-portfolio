@@ -70,6 +70,9 @@ export const ui = {
     testimonialSuccess: 'Thank you! Your feedback was submitted and is pending review.',
     testimonialError: 'Failed to submit review. Please check all fields and try again.',
     noTestimonials: 'No testimonials published yet.',
+    previousPage: 'Previous',
+    nextPage: 'Next',
+    pageOf: 'Page',
   },
   ar: {
     resumeLabel: 'سيرة ذاتية / أعمال',
@@ -140,6 +143,9 @@ export const ui = {
     testimonialSuccess: 'شكرًا لك! تم إرسال رأيك بنجاح وبانتظار المراجعة.',
     testimonialError: 'تعذر إرسال الرأي، يرجى ملء الحقول المطلوبة والمحاولة مرة أخرى.',
     noTestimonials: 'لا توجد آراء منشورة حتى الآن.',
+    previousPage: 'السابق',
+    nextPage: 'التالي',
+    pageOf: 'صفحة',
   },
 } as const;
 

@@ -4,7 +4,7 @@ import type { Certificate, Locale, PortfolioData, Project, ProjectCategory } fro
 import { ui } from '../i18n';
 import { Sculpture } from '../Sculpture';
 import { DigitalTwinChat } from '../components/DigitalTwinChat';
-import { findTechnologyIcons, savedTechnologyIconUrl } from '../lib/technology-icons';
+import { findTechnologyIcons, isSameTechnology, savedTechnologyIconUrl } from '../lib/technology-icons';
 import { supabase } from '../lib/supabase';
 
 function Arrow({ diagonal = false }: { diagonal?: boolean }) {
@@ -24,32 +24,46 @@ function TechnologyIcon({ technology }: { technology: { name: string; icon: stri
   const [candidates, setCandidates] = useState<string[]>([]);
   const [candidateIndex, setCandidateIndex] = useState(0);
   const [failed, setFailed] = useState(false);
-  const [searching, setSearching] = useState(!technology.icon.includes(':'));
-  const fallback = technology.name.trim().slice(0, 2).toUpperCase();
+  const [searching, setSearching] = useState(false);
+
   useEffect(() => {
     let active = true;
     setFailed(false);
     setCandidateIndex(0);
+
     const savedIcon = savedTechnologyIconUrl(technology.icon);
     if (savedIcon) {
       setSearching(false);
       setCandidates([savedIcon]);
-    } else {
-      setSearching(true);
-      setCandidates([]);
-      void findTechnologyIcons(technology.name, technology.icon).then((resolved) => {
-        if (active) {
-          setCandidates(resolved);
-          setSearching(false);
-        }
-      });
+      return;
     }
+
+    setSearching(true);
+    setCandidates([]);
+    void findTechnologyIcons(technology.name, technology.icon).then((resolved) => {
+      if (active) {
+        setCandidates(resolved);
+        setSearching(false);
+      }
+    });
     return () => { active = false; };
   }, [technology.name, technology.icon]);
 
   const iconUrl = candidates[candidateIndex];
+
   if (searching) return <span className="technology-icon-loading" aria-hidden="true" />;
-  if (!iconUrl || failed) return <span className="technology-icon-fallback" aria-hidden="true">{fallback}</span>;
+
+  if (!iconUrl || failed) {
+    return (
+      <span className="technology-icon-fallback" aria-hidden="true" title={technology.name}>
+        <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+          <polyline points="16 18 22 12 16 6" />
+          <polyline points="8 6 2 12 8 18" />
+        </svg>
+      </span>
+    );
+  }
+
   return (
     <img
       src={iconUrl}
@@ -64,23 +78,51 @@ function TechnologyIcon({ technology }: { technology: { name: string; icon: stri
 }
 
 function findTechnology(name: string, technologies: PortfolioData['technologies']) {
-  const slug = technologySlug(name);
+  if (!name) return undefined;
   const normalized = name.toLowerCase().replace(/\s+/g, ' ').trim();
   return technologies.find((item) => {
+    if (isSameTechnology(item.name, name) || isSameTechnology(item.slug, name)) {
+      return true;
+    }
     const catalogName = item.name.toLowerCase().trim();
-    const catalogBaseName = catalogName.replace(/\s*\([^)]*\)/g, '').trim();
-    return item.slug === slug
-      || catalogName === normalized
-      || catalogBaseName === normalized.replace(/\s*\([^)]*\)/g, '').trim()
-      || normalized.startsWith(catalogName + ' ');
+    return catalogName === normalized
+      || normalized.startsWith(catalogName + ' ')
+      || catalogName.startsWith(normalized + ' ');
   });
+}
+
+function SkeletonImage({
+  src,
+  alt,
+  className = '',
+  loading = 'lazy',
+}: {
+  src: string;
+  alt: string;
+  className?: string;
+  loading?: 'lazy' | 'eager';
+}) {
+  const [loaded, setLoaded] = useState(false);
+
+  return (
+    <div className="skeleton-image-wrapper">
+      {!loaded && <div className="skeleton-image-placeholder skeleton-shimmer" aria-hidden="true" />}
+      <img
+        src={src}
+        alt={alt}
+        loading={loading}
+        className={`${className} ${loaded ? 'img-fade-in' : 'img-hidden'}`}
+        onLoad={() => setLoaded(true)}
+      />
+    </div>
+  );
 }
 
 function Cover({ p, index }: { p: Project; index: number }) {
   if (p.image_url) {
     return (
       <div className="project-visual cover-img">
-        <img src={p.image_url} alt={p.name} loading="lazy" />
+        <SkeletonImage src={p.image_url} alt={p.name} loading="lazy" />
       </div>
     );
   }
@@ -94,14 +136,38 @@ function Cover({ p, index }: { p: Project; index: number }) {
   );
 }
 
+function getPageNumbers(current: number, total: number): (number | '...')[] {
+  if (total <= 6) {
+    return Array.from({ length: total }, (_, i) => i + 1);
+  }
+  if (current <= 3) {
+    return [1, 2, 3, 4, '...', total];
+  }
+  if (current >= total - 2) {
+    return [1, '...', total - 3, total - 2, total - 1, total];
+  }
+  return [1, '...', current - 1, current, current + 1, '...', total];
+}
+
 export function Portfolio({ data, locale, setLocale }: { data: PortfolioData; locale: Locale; setLocale: (l: Locale) => void }) {
+  const PROJECTS_PER_PAGE = 5;
   const t = ui[locale];
   const p = data.profile;
   const [category, setCategory] = useState<ProjectCategory | 'all'>('all');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [isFiltering, setIsFiltering] = useState(false);
   const [selected, setSelected] = useState<number | null>(null);
   const [selectedCertificate, setSelectedCertificate] = useState<Certificate | null>(null);
   const [feedbackOpen, setFeedbackOpen] = useState(false);
   const [notice, setNotice] = useState('');
+
+  const handleCategoryChange = (nextCategory: ProjectCategory | 'all') => {
+    if (category === nextCategory) return;
+    setIsFiltering(true);
+    setCategory(nextCategory);
+    setCurrentPage(1);
+    setTimeout(() => setIsFiltering(false), 220);
+  };
 
   // Testimonial submission form state
   const [feedbackName, setFeedbackName] = useState('');
@@ -117,12 +183,32 @@ export function Portfolio({ data, locale, setLocale }: { data: PortfolioData; lo
   const feedbackDialog = useRef<HTMLDialogElement>(null);
   const marqueeTrackRef = useRef<HTMLDivElement>(null);
   const isHoveredRef = useRef(false);
+  const certOffsetRef = useRef(0);
+  const isCertModalOpenRef = useRef(false);
+
+  const testimonialTrackRef = useRef<HTMLDivElement>(null);
+  const isTestimonialHoveredRef = useRef(false);
+  const testimonialOffsetRef = useRef(0);
+
   const cvPdfUrl = `${import.meta.env.BASE_URL}Taha_Ahmed_Hodhod_CV.pdf`;
 
   const L = (en: string, ar: string) => (locale === 'ar' ? ar : en);
   const name = L(p.name_en, p.name_ar);
   const role = L(p.role_en, p.role_ar);
   const items = category === 'all' ? data.projects : data.projects.filter((x) => x.category === category);
+  const totalPages = Math.max(1, Math.ceil(items.length / PROJECTS_PER_PAGE));
+  const safePage = Math.min(Math.max(1, currentPage), totalPages);
+  const paginatedItems = items.slice((safePage - 1) * PROJECTS_PER_PAGE, safePage * PROJECTS_PER_PAGE);
+
+  const goToPage = (pageNumber: number) => {
+    const next = Math.min(Math.max(1, pageNumber), totalPages);
+    setCurrentPage(next);
+    const workSection = document.getElementById('work');
+    if (workSection) {
+      workSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  };
+
   const categories = data.categories;
   const project = data.projects.find((x) => x.id === selected) ?? null;
   const degrees = data.education.filter((e) => e.kind === 'degree');
@@ -178,12 +264,16 @@ export function Portfolio({ data, locale, setLocale }: { data: PortfolioData; lo
     return () => clearTimeout(timer);
   }, [notice]);
 
-  // Continuous infinite marquee animation loop
+  // Keep isCertModalOpenRef in sync with selectedCertificate
+  useEffect(() => {
+    isCertModalOpenRef.current = !!selectedCertificate;
+  }, [selectedCertificate]);
+
+  // Continuous infinite marquee animation loop for certificates (preserves position across modal open/close)
   useEffect(() => {
     const el = marqueeTrackRef.current;
     if (!el || data.certificates.length === 0) return;
 
-    let offset = 0;
     let animId: number;
     let lastTime = performance.now();
 
@@ -191,14 +281,14 @@ export function Portfolio({ data, locale, setLocale }: { data: PortfolioData; lo
       const delta = Math.min((now - lastTime) / 1000, 0.1);
       lastTime = now;
 
-      if (!selectedCertificate) {
+      if (!isCertModalOpenRef.current) {
         const speed = isHoveredRef.current ? 20 : 50;
-        offset += delta * speed;
+        certOffsetRef.current += delta * speed;
         const halfWidth = el.scrollWidth / 2;
-        if (halfWidth > 0 && offset >= halfWidth) {
-          offset = offset % halfWidth;
+        if (halfWidth > 0 && certOffsetRef.current >= halfWidth) {
+          certOffsetRef.current = certOffsetRef.current % halfWidth;
         }
-        el.style.transform = `translate3d(-${offset}px, 0, 0)`;
+        el.style.transform = `translate3d(-${certOffsetRef.current}px, 0, 0)`;
       }
 
       animId = requestAnimationFrame(step);
@@ -206,7 +296,36 @@ export function Portfolio({ data, locale, setLocale }: { data: PortfolioData; lo
 
     animId = requestAnimationFrame(step);
     return () => cancelAnimationFrame(animId);
-  }, [data.certificates, selectedCertificate]);
+  }, [data.certificates]);
+
+  // Continuous infinite marquee animation loop for testimonials
+  useEffect(() => {
+    const el = testimonialTrackRef.current;
+    if (!el || data.testimonials.length === 0) return;
+
+    let animId: number;
+    let lastTime = performance.now();
+
+    const step = (now: number) => {
+      const delta = Math.min((now - lastTime) / 1000, 0.1);
+      lastTime = now;
+
+      if (!feedbackOpen) {
+        const speed = isTestimonialHoveredRef.current ? 15 : 40;
+        testimonialOffsetRef.current += delta * speed;
+        const halfWidth = el.scrollWidth / 2;
+        if (halfWidth > 0 && testimonialOffsetRef.current >= halfWidth) {
+          testimonialOffsetRef.current = testimonialOffsetRef.current % halfWidth;
+        }
+        el.style.transform = `translate3d(-${testimonialOffsetRef.current}px, 0, 0)`;
+      }
+
+      animId = requestAnimationFrame(step);
+    };
+
+    animId = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(animId);
+  }, [data.testimonials, feedbackOpen]);
 
   async function copyEmail() {
     try { await navigator.clipboard.writeText(p.email); setNotice(t.copied); }
@@ -338,33 +457,89 @@ export function Portfolio({ data, locale, setLocale }: { data: PortfolioData; lo
                     const option = categories.find((item) => item.slug === k);
                     const label = k === 'all' ? t.all : (locale === 'ar' ? option?.name_ar : option?.name_en) || k;
                     return (
-                      <button key={k} onClick={() => setCategory(k)} aria-pressed={category === k}>
+                      <button key={k} onClick={() => handleCategoryChange(k)} aria-pressed={category === k}>
                         {label}{k === 'all' && <span>{String(data.projects.length).padStart(2, '0')}</span>}
                       </button>
                     );
                   })}
                 </div>
-                <span role="status" aria-live="polite">{items.length} {t.resultCount}</span>
+                <span role="status" aria-live="polite">
+                  {totalPages > 1
+                    ? (locale === 'ar'
+                        ? `${t.pageOf} ${safePage} من ${totalPages} · ${items.length} ${t.resultCount}`
+                        : `${t.pageOf} ${safePage} of ${totalPages} · ${items.length} ${t.resultCount}`)
+                    : `${items.length} ${t.resultCount}`}
+                </span>
               </div>
-              <div className={'project-grid ' + (items.length === 1 ? 'single-result' : '')}>
-                {items.map((proj, i) => (
-                  <article key={proj.id ?? proj.name} className="project-card">
-                    <button className="project-open" onClick={() => setSelected(proj.id ?? null)} aria-label={proj.name}>
-                      <Cover p={proj} index={i} />
-                      <div className="project-caption">
-                        <div>
-                          <span className="project-number">/{String(i + 1).padStart(2, '0')}</span>
-                          <h3>{proj.name}</h3>
-                          <span className="project-year">{proj.year}</span>
+              <div className={'project-grid projects-container-transition ' + (isFiltering ? 'is-changing ' : '') + (paginatedItems.length === 1 ? 'single-result' : '')}>
+                {paginatedItems.map((proj, i) => {
+                  const globalIndex = (safePage - 1) * PROJECTS_PER_PAGE + i;
+                  return (
+                    <article key={proj.id ?? proj.name} className="project-card">
+                      <button className="project-open" onClick={() => setSelected(proj.id ?? null)} aria-label={proj.name}>
+                        <Cover p={proj} index={globalIndex} />
+                        <div className="project-caption">
+                          <div>
+                            <span className="project-number">/{String(globalIndex + 1).padStart(2, '0')}</span>
+                            <h3>{proj.name}</h3>
+                            <span className="project-year">{proj.year}</span>
+                          </div>
+                          <span className="project-arrow"><Arrow diagonal /></span>
                         </div>
-                        <span className="project-arrow"><Arrow diagonal /></span>
-                      </div>
-                      <p className="project-headline">{L(proj.headline_en, proj.headline_ar)}</p>
-                      <div className="project-tags">{proj.tags.map((tag) => <span key={tag}>{tag}</span>)}</div>
-                    </button>
-                  </article>
-                ))}
+                        <p className="project-headline">{L(proj.headline_en, proj.headline_ar)}</p>
+                        <div className="project-tags">{proj.tags.map((tag) => <span key={tag}>{tag}</span>)}</div>
+                      </button>
+                    </article>
+                  );
+                })}
               </div>
+
+              {totalPages > 1 && (
+                <nav className="projects-pagination" aria-label={locale === 'ar' ? 'التنقل بين صفحات المشاريع' : 'Projects pagination'}>
+                  <button
+                    type="button"
+                    className="pagination-btn pagination-prev"
+                    onClick={() => goToPage(safePage - 1)}
+                    disabled={safePage <= 1}
+                    aria-label={t.previousPage}
+                  >
+                    <span className="pagination-arrow" aria-hidden="true">{locale === 'ar' ? '→' : '←'}</span>
+                    <span>{t.previousPage}</span>
+                  </button>
+
+                  <div className="pagination-pages" role="group" aria-label={locale === 'ar' ? 'أرقام الصفحات' : 'Page numbers'}>
+                    {getPageNumbers(safePage, totalPages).map((pageNum, idx) => {
+                      if (pageNum === '...') {
+                        return <span key={`ellipsis-${idx}`} className="pagination-ellipsis" aria-hidden="true">…</span>;
+                      }
+                      const isCurrent = pageNum === safePage;
+                      return (
+                        <button
+                          key={pageNum}
+                          type="button"
+                          className={`pagination-pill ${isCurrent ? 'active' : ''}`}
+                          onClick={() => goToPage(Number(pageNum))}
+                          aria-current={isCurrent ? 'page' : undefined}
+                          aria-label={`${t.pageOf} ${pageNum}`}
+                        >
+                          {pageNum}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  <button
+                    type="button"
+                    className="pagination-btn pagination-next"
+                    onClick={() => goToPage(safePage + 1)}
+                    disabled={safePage >= totalPages}
+                    aria-label={t.nextPage}
+                  >
+                    <span>{t.nextPage}</span>
+                    <span className="pagination-arrow" aria-hidden="true">{locale === 'ar' ? '←' : '→'}</span>
+                  </button>
+                </nav>
+              )}
             </section>
           )}
 
@@ -404,22 +579,30 @@ export function Portfolio({ data, locale, setLocale }: { data: PortfolioData; lo
               <div className="toolkit">
                 <div><h3>{t.toolkit}</h3><p>{t.toolNote}</p></div>
                 <div className="skill-list">
-                  {data.skills.map((g) => (
-                    <div key={g.id ?? g.title_en}>
-                      <h4>{L(g.title_en, g.title_ar)}</h4>
-                      <div className="technology-list">
-                        {L(g.items_en, g.items_ar).split(/[·,]/).map((item) => item.trim()).filter(Boolean).map((techName) => {
-                          const technology = findTechnology(techName, data.technologies);
-                          return (
-                            <span className="technology-chip" key={techName}>
-                              {technology && <TechnologyIcon technology={technology} />}
-                              <span>{techName}</span>
-                            </span>
-                          );
-                        })}
+                  {data.skills.map((g) => {
+                    const enItems = g.items_en.split(/[·,]/).map((item) => item.trim()).filter(Boolean);
+                    const arItems = g.items_ar.split(/[·,]/).map((item) => item.trim()).filter(Boolean);
+                    return (
+                      <div key={g.id ?? g.title_en}>
+                        <h4>{L(g.title_en, g.title_ar)}</h4>
+                        <div className="technology-list">
+                          {enItems.map((enTech, idx) => {
+                            const arTech = arItems[idx] || enTech;
+                            const displayName = locale === 'ar' ? arTech : enTech;
+                            const technology = findTechnology(enTech, data.technologies)
+                              || findTechnology(displayName, data.technologies)
+                              || { name: enTech, icon: '', slug: technologySlug(enTech) };
+                            return (
+                              <span className="technology-chip" key={enTech}>
+                                <TechnologyIcon technology={technology} />
+                                <span>{displayName}</span>
+                              </span>
+                            );
+                          })}
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
               <div className="education">
@@ -471,7 +654,7 @@ export function Portfolio({ data, locale, setLocale }: { data: PortfolioData; lo
                       >
                         <div className="cert-card-img">
                           {cert.image_url ? (
-                            <img src={cert.image_url} alt="" loading="lazy" />
+                            <SkeletonImage src={cert.image_url} alt={cert.title} loading="lazy" />
                           ) : (
                             <div className="cert-card-placeholder">
                               <span>🎓</span>
@@ -497,7 +680,7 @@ export function Portfolio({ data, locale, setLocale }: { data: PortfolioData; lo
                       >
                         <div className="cert-card-img">
                           {cert.image_url ? (
-                            <img src={cert.image_url} alt="" loading="lazy" />
+                            <SkeletonImage src={cert.image_url} alt="" loading="lazy" />
                           ) : (
                             <div className="cert-card-placeholder">
                               <span>🎓</span>
@@ -535,34 +718,77 @@ export function Portfolio({ data, locale, setLocale }: { data: PortfolioData; lo
                 </div>
               </div>
               {data.testimonials.length > 0 ? (
-                <div className="testimonials-grid">
-                  {data.testimonials.map((item) => (
-                    <article key={item.id ?? item.client_name} className="testimonial-card">
-                      <div className="testimonial-stars" aria-label={`${item.rating || 5} out of 5 stars`}>
-                        {Array.from({ length: item.rating || 5 }).map((_, i) => (
-                          <span key={i} className="star-icon" aria-hidden="true">★</span>
-                        ))}
-                      </div>
-                      <p className="testimonial-content">“{item.content}”</p>
-                      <div className="testimonial-author">
-                        <div className="testimonial-avatar" aria-hidden="true">
-                          {item.avatar_url ? (
-                            <img src={item.avatar_url} alt="" loading="lazy" />
-                          ) : (
-                            <span>{item.client_name.slice(0, 2).toUpperCase()}</span>
-                          )}
-                        </div>
-                        <div className="testimonial-meta">
-                          <h3 className="testimonial-name">{item.client_name}</h3>
-                          {(item.client_role || item.client_company) && (
-                            <p className="testimonial-role">
-                              {[item.client_role, item.client_company].filter(Boolean).join(' · ')}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                    </article>
-                  ))}
+                <div
+                  className="marquee-shell testimonials-marquee-shell"
+                  onMouseEnter={() => { isTestimonialHoveredRef.current = true; }}
+                  onMouseLeave={() => { isTestimonialHoveredRef.current = false; }}
+                >
+                  <div ref={testimonialTrackRef} className="marquee-js-track">
+                    <div className="marquee-group">
+                      {(data.testimonials.length < 4
+                        ? [...data.testimonials, ...data.testimonials, ...data.testimonials, ...data.testimonials]
+                        : [...data.testimonials, ...data.testimonials]
+                      ).map((item, idx) => (
+                        <article key={`t1-${item.id ?? item.client_name}-${idx}`} className="testimonial-card">
+                          <div className="testimonial-stars" aria-label={`${item.rating || 5} out of 5 stars`}>
+                            {Array.from({ length: item.rating || 5 }).map((_, i) => (
+                              <span key={i} className="star-icon" aria-hidden="true">★</span>
+                            ))}
+                          </div>
+                          <p className="testimonial-content">“{item.content}”</p>
+                          <div className="testimonial-author">
+                            <div className="testimonial-avatar" aria-hidden="true">
+                              {item.avatar_url ? (
+                                <SkeletonImage src={item.avatar_url} alt="" loading="lazy" />
+                              ) : (
+                                <span>{item.client_name.slice(0, 2).toUpperCase()}</span>
+                              )}
+                            </div>
+                            <div className="testimonial-meta">
+                              <h3 className="testimonial-name">{item.client_name}</h3>
+                              {(item.client_role || item.client_company) && (
+                                <p className="testimonial-role">
+                                  {[item.client_role, item.client_company].filter(Boolean).join(' · ')}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                        </article>
+                      ))}
+                    </div>
+                    <div className="marquee-group" aria-hidden="true">
+                      {(data.testimonials.length < 4
+                        ? [...data.testimonials, ...data.testimonials, ...data.testimonials, ...data.testimonials]
+                        : [...data.testimonials, ...data.testimonials]
+                      ).map((item, idx) => (
+                        <article key={`t2-${item.id ?? item.client_name}-${idx}`} className="testimonial-card" tabIndex={-1}>
+                          <div className="testimonial-stars" aria-label={`${item.rating || 5} out of 5 stars`}>
+                            {Array.from({ length: item.rating || 5 }).map((_, i) => (
+                              <span key={i} className="star-icon" aria-hidden="true">★</span>
+                            ))}
+                          </div>
+                          <p className="testimonial-content">“{item.content}”</p>
+                          <div className="testimonial-author">
+                            <div className="testimonial-avatar" aria-hidden="true">
+                              {item.avatar_url ? (
+                                <SkeletonImage src={item.avatar_url} alt="" loading="lazy" />
+                              ) : (
+                                <span>{item.client_name.slice(0, 2).toUpperCase()}</span>
+                              )}
+                            </div>
+                            <div className="testimonial-meta">
+                              <h3 className="testimonial-name">{item.client_name}</h3>
+                              {(item.client_role || item.client_company) && (
+                                <p className="testimonial-role">
+                                  {[item.client_role, item.client_company].filter(Boolean).join(' · ')}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                        </article>
+                      ))}
+                    </div>
+                  </div>
                 </div>
               ) : (
                 <div className="testimonials-empty">
@@ -660,7 +886,7 @@ export function Portfolio({ data, locale, setLocale }: { data: PortfolioData; lo
               {/* 1. Main Project Image FIRST */}
               {project.image_url ? (
                 <div className="dialog-hero-frame">
-                  <img className="dialog-image" src={project.image_url} alt={project.name} />
+                  <SkeletonImage className="dialog-image" src={project.image_url} alt={project.name} loading="eager" />
                 </div>
               ) : (
                 <div className="dialog-hero-frame dialog-fallback-frame">
@@ -683,10 +909,11 @@ export function Portfolio({ data, locale, setLocale }: { data: PortfolioData; lo
                   <span className="dialog-sublabel">{locale === 'ar' ? 'التقنيات المستخدمة:' : 'Technologies:'}</span>
                   <div className="technology-list">
                     {project.tags.map((tag) => {
-                      const tech = findTechnology(tag, data.technologies);
+                      const tech = findTechnology(tag, data.technologies)
+                        || { name: tag, icon: '', slug: technologySlug(tag) };
                       return (
                         <span className="technology-chip" key={tag}>
-                          {tech && <TechnologyIcon technology={tech} />}
+                          <TechnologyIcon technology={tech} />
                           <span>{tag}</span>
                         </span>
                       );
@@ -738,7 +965,7 @@ export function Portfolio({ data, locale, setLocale }: { data: PortfolioData; lo
             <div className="dialog-content">
               {selectedCertificate.image_url ? (
                 <div className="dialog-hero-frame cert-hero-frame">
-                  <img className="dialog-image" src={selectedCertificate.image_url} alt={selectedCertificate.title} />
+                  <SkeletonImage className="dialog-image" src={selectedCertificate.image_url} alt={selectedCertificate.title} loading="eager" />
                 </div>
               ) : (
                 <div className="dialog-hero-frame cert-fallback-frame">

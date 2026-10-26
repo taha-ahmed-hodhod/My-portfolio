@@ -2,21 +2,36 @@ import { useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { supabase, isSupabaseConfigured, STORAGE_BUCKET, isAdminEmail } from '../lib/supabase';
 import { defaultData } from '../default-content';
-import type { Profile, Experience, Project, SkillGroup, Education, ProjectCategoryOption, Technology, Certificate, Testimonial } from '../types';
+import { curatedIcon, isSameTechnology, savedTechnologyIconUrl, technologySlug } from '../lib/technology-icons';
+import { TechnologyIconPicker } from '../components/TechnologyIconPicker';
+import type { Profile, Experience, Project, SkillGroup, Education, ProjectCategoryOption, Technology, Certificate, Testimonial, Locale } from '../types';
+import { AdminSidebar, type AdminTab } from '../components/admin/AdminSidebar';
+import { AdminTopBar } from '../components/admin/AdminTopBar';
+import { AdminOverviewBento } from '../components/admin/AdminOverviewBento';
+import { AdminProfileManager } from '../components/admin/AdminProfileManager';
+import { AdminTestimonialsManager } from '../components/admin/AdminTestimonialsManager';
+import { AdminSiteSettingsManager } from '../components/admin/AdminSiteSettingsManager';
+import { AdminDashboardSkeleton } from '../components/admin/AdminDashboardSkeleton';
+import { adminI18n } from '../adminI18n';
+import { Plus, Pencil, Trash2, Save, X, SearchX, Check, Upload, Tag } from 'lucide-react';
 
-type Tab =
-  | 'profile'
-  | 'projects'
-  | 'categories'
-  | 'technologies'
-  | 'certificates'
-  | 'testimonials'
-  | 'experiences'
-  | 'skills'
-  | 'education'
-  | 'settings';
+type Tab = AdminTab;
 
-/* ---------- form helpers ---------- */
+interface ToastMessage {
+  id: string;
+  type: 'success' | 'error' | 'info';
+  message: string;
+}
+
+interface ConfirmDialogState {
+  isOpen: boolean;
+  title: string;
+  message: string;
+  confirmLabel?: string;
+  onConfirm: () => void;
+}
+
+/* ---------- Form Helpers ---------- */
 
 function Field({ label, value, onChange, textarea, placeholder }: { label: string; value: string; onChange: (v: string) => void; textarea?: boolean; placeholder?: string }) {
   return (
@@ -29,18 +44,9 @@ function Field({ label, value, onChange, textarea, placeholder }: { label: strin
   );
 }
 
-function technologySlug(name: string): string {
-  return name
-    .toLowerCase()
-    .trim()
-    .replace(/[+#]/g, '')
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-|-$/g, '');
-}
-
-function skillTechnologyNames(groups: Array<Pick<SkillGroup, 'items_en'>>): string[] {
+function skillTechnologyNames(groups: Array<{ items_en?: string; items_ar?: string }>): string[] {
   return [...new Set(groups
-    .flatMap((group) => group.items_en.split(/[·,]/))
+    .flatMap((group) => (group.items_en || '').split(/[·•,،;\n|/]+/))
     .map((name) => name.trim())
     .filter(Boolean))];
 }
@@ -56,10 +62,9 @@ function errorMessage(error: unknown): string {
   return String(error);
 }
 
-/* ---------- Image Upload & Optimization Pipeline (PHASE 4) ---------- */
+/* ---------- Image Upload & Optimization Pipeline ---------- */
 
 async function optimizeImage(file: File): Promise<{ blob: Blob; originalSize: number; optimizedSize: number }> {
-  // If it's already a small WebP (< 500KB), don't degrade it further
   if (file.type === 'image/webp' && file.size < 500 * 1024) {
     return { blob: file, originalSize: file.size, optimizedSize: file.size };
   }
@@ -74,7 +79,6 @@ async function optimizeImage(file: File): Promise<{ blob: Blob; originalSize: nu
   const context = canvas.getContext('2d');
   if (!context) throw new Error('Could not initialize canvas context for optimization.');
 
-  // Render with high quality smoothing
   context.imageSmoothingEnabled = true;
   context.imageSmoothingQuality = 'high';
   context.drawImage(image, 0, 0, canvas.width, canvas.height);
@@ -110,17 +114,70 @@ async function uploadImage(file: File, folder: string, onProgress?: (status: str
   return supabase.storage.from(STORAGE_BUCKET).getPublicUrl(path).data.publicUrl;
 }
 
-/* ---------- ImagePicker: Raw URLs completely hidden (PHASE 4) ---------- */
+/* ---------- ImagePicker: Clean UI with no alert/confirm ---------- */
 
-function ImagePicker({ value, folder, onChange }: { value: string; folder: string; onChange: (url: string) => void }) {
+function ImagePicker({
+  value,
+  folder,
+  onChange,
+  hidePreview,
+  buttonLabel,
+}: {
+  value: string;
+  folder: string;
+  onChange: (url: string) => void;
+  hidePreview?: boolean;
+  buttonLabel?: string;
+}) {
   const [busy, setBusy] = useState(false);
   const [statusText, setStatusText] = useState('');
   const [uploadError, setUploadError] = useState('');
 
-  // Extract a readable file identifier from the URL
   const displayName = value
     ? value.split('/').pop()?.split('?')[0] || 'Optimized asset'
     : '';
+
+  if (hidePreview) {
+    return (
+      <div className="avatar-upload-control">
+        <label className="hero-secondary-btn avatar-upload-btn">
+          <Upload size={14} />
+          <span>
+            {busy
+              ? statusText || 'Processing…'
+              : buttonLabel || (value ? 'Replace image' : 'Choose image')}
+          </span>
+          <input
+            type="file"
+            accept="image/*"
+            hidden
+            disabled={busy}
+            onChange={async (e) => {
+              const f = e.target.files?.[0];
+              if (!f) return;
+              setBusy(true);
+              setUploadError('');
+              try {
+                const newUrl = await uploadImage(f, folder, setStatusText);
+                onChange(newUrl);
+              } catch (err) {
+                setUploadError(err instanceof Error ? err.message : String(err));
+              } finally {
+                setBusy(false);
+                setStatusText('');
+                e.target.value = '';
+              }
+            }}
+          />
+        </label>
+        {uploadError && (
+          <span className="avatar-upload-error" role="alert">
+            {uploadError}
+          </span>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="af image-picker-card">
@@ -191,9 +248,7 @@ function ImagePicker({ value, folder, onChange }: { value: string; folder: strin
               <button
                 type="button"
                 className="text-action image-remove-btn"
-                onClick={() => {
-                  if (confirm('Remove this image?')) onChange('');
-                }}
+                onClick={() => onChange('')}
               >
                 Remove
               </button>
@@ -205,17 +260,231 @@ function ImagePicker({ value, folder, onChange }: { value: string; folder: strin
   );
 }
 
-/* ---------- Main Admin Dashboard with Persistent Sidebar (PHASE 1) ---------- */
+/* ---------- Interactive Technology List & Icon Editor ---------- */
+
+function TechnologyListEditor({
+  label,
+  technologies,
+  selectedNames,
+  onChange,
+  onUpsertTechnology,
+}: {
+  label: string;
+  technologies: Technology[];
+  selectedNames: string[];
+  onChange: (names: string[]) => void;
+  onUpsertTechnology: (tech: { name: string; icon: string; originalName?: string }) => Promise<void>;
+}) {
+  const [showAdd, setShowAdd] = useState(false);
+  const [nameInput, setNameInput] = useState('');
+  const [iconInput, setIconInput] = useState('');
+  const [editingIndex, setEditingIndex] = useState<number | null>(null);
+
+  const startAddNew = () => {
+    setNameInput('');
+    setIconInput('');
+    setEditingIndex(null);
+    setShowAdd(true);
+  };
+
+  const startEdit = (name: string, index: number) => {
+    const matched = technologies.find(
+      (t) => isSameTechnology(t.name, name) || isSameTechnology(t.slug, name)
+    );
+    setNameInput(name);
+    setIconInput(matched?.icon || curatedIcon(name) || '');
+    setEditingIndex(index);
+    setShowAdd(true);
+  };
+
+  const handleRemove = (nameToRemove: string) => {
+    onChange(selectedNames.filter((n) => !isSameTechnology(n, nameToRemove)));
+  };
+
+  const handleSaveTech = async () => {
+    const cleanName = nameInput.trim();
+    if (!cleanName) return;
+
+    const originalName = editingIndex !== null ? selectedNames[editingIndex] : undefined;
+
+    if (editingIndex !== null) {
+      const updated = [...selectedNames];
+      updated[editingIndex] = cleanName;
+      onChange(updated);
+    } else {
+      if (!selectedNames.some((n) => isSameTechnology(n, cleanName))) {
+        onChange([...selectedNames, cleanName]);
+      }
+    }
+
+    await onUpsertTechnology({ name: cleanName, icon: iconInput, originalName });
+    setShowAdd(false);
+    setNameInput('');
+    setIconInput('');
+    setEditingIndex(null);
+  };
+
+  return (
+    <div className="af tech-list-editor-field">
+      <div className="tech-list-editor-header">
+        <span>{label}</span>
+        <button
+          type="button"
+          className="primary-action btn-sm add-tech-trigger-btn"
+          onClick={startAddNew}
+        >
+          + Add Technology
+        </button>
+      </div>
+
+      <div className="tech-chips-tray">
+        {selectedNames.map((name, idx) => {
+          const matched = technologies.find(
+            (t) => isSameTechnology(t.name, name) || isSameTechnology(t.slug, name)
+          );
+          const iconVal = matched?.icon || curatedIcon(name);
+          const iconUrl = iconVal ? savedTechnologyIconUrl(iconVal) : null;
+
+          return (
+            <span key={`${name}-${idx}`} className="tech-chip-item">
+              <button
+                type="button"
+                className="tech-chip-content-btn"
+                onClick={() => startEdit(name, idx)}
+                title={`Click to edit ${name}`}
+              >
+                {iconUrl ? (
+                  <img src={iconUrl} alt="" className="tech-chip-icon" />
+                ) : (
+                  <span className="tech-chip-fallback">⚡</span>
+                )}
+                <span className="tech-chip-text">{name}</span>
+              </button>
+              <button
+                type="button"
+                className="tech-chip-remove-btn"
+                onClick={() => handleRemove(name)}
+                title={`Remove ${name}`}
+                aria-label={`Remove ${name}`}
+              >
+                ✕
+              </button>
+            </span>
+          );
+        })}
+
+        {selectedNames.length === 0 && (
+          <span className="tech-chips-empty">
+            No technologies added yet. Click “+ Add Technology” to add your tools.
+          </span>
+        )}
+      </div>
+
+      {showAdd && (
+        <div className="tech-mini-editor-card">
+          <div className="tech-mini-head">
+            <h5>{editingIndex !== null ? 'Edit Technology & Icon' : 'Add New Technology'}</h5>
+            <button
+              type="button"
+              className="text-action btn-sm"
+              onClick={() => setShowAdd(false)}
+            >
+              ✕
+            </button>
+          </div>
+
+          <div className="af-grid" style={{ marginBottom: '12px' }}>
+            <label className="af">
+              <span>Technology Name</span>
+              <input
+                type="text"
+                placeholder="e.g. React, Next.js, Docker, Python"
+                value={nameInput}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setNameInput(val);
+                  if (!iconInput || iconInput === curatedIcon(nameInput)) {
+                    const matched = technologies.find(
+                      (t) => isSameTechnology(t.name, val) || isSameTechnology(t.slug, val)
+                    );
+                    if (matched?.icon) {
+                      setIconInput(matched.icon);
+                    } else {
+                      const auto = curatedIcon(val);
+                      if (auto) setIconInput(auto);
+                    }
+                  }
+                }}
+              />
+            </label>
+
+            <TechnologyIconPicker
+              value={iconInput}
+              technologyName={nameInput}
+              onChange={(newIcon) => {
+                setIconInput(newIcon);
+                if (editingIndex !== null) {
+                  const originalName = selectedNames[editingIndex];
+                  const cleanName = nameInput.trim() || originalName;
+                  void onUpsertTechnology({ name: cleanName, icon: newIcon, originalName });
+                }
+              }}
+            />
+          </div>
+
+          <div className="tech-mini-actions">
+            <button
+              type="button"
+              className="primary-action btn-sm"
+              disabled={!nameInput.trim()}
+              onClick={handleSaveTech}
+            >
+              {editingIndex !== null ? 'Update Technology' : 'Add to List'} ✓
+            </button>
+            <button
+              type="button"
+              className="text-action btn-sm"
+              onClick={() => setShowAdd(false)}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ---------- Main Admin Dashboard with Persistent Sidebar ---------- */
 
 export function AdminDashboard() {
   const navigate = useNavigate();
-  const [tab, setTab] = useState<Tab>('profile');
+  const [tab, setTab] = useState<AdminTab>('overview');
   const [ready, setReady] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState('');
   const [loadError, setLoadError] = useState('');
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [adminUserEmail, setAdminUserEmail] = useState('');
+
+  // Locale state persisted in localStorage
+  const [adminLocale, setAdminLocale] = useState<Locale>(() => {
+    const saved = localStorage.getItem('admin_locale');
+    return saved === 'ar' || saved === 'en' ? saved : 'en';
+  });
+
+  const toggleAdminLocale = () => {
+    const next = adminLocale === 'en' ? 'ar' : 'en';
+    setAdminLocale(next);
+    localStorage.setItem('admin_locale', next);
+  };
+
+  const [searchFilter, setSearchFilter] = useState('');
+
+  // Toast System State
+  const [toasts, setToasts] = useState<ToastMessage[]>([]);
+
+  // Confirmation Modal State
+  const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState | null>(null);
 
   const [profile, setProfile] = useState<Profile>(defaultData.profile);
   const [experiences, setExperiences] = useState<Experience[]>([]);
@@ -235,7 +504,37 @@ export function AdminDashboard() {
     section_testimonials_visible: true,
   });
 
-  const flash = (msg: string) => { setSaved(msg); setTimeout(() => setSaved(''), 3000); };
+  const showToast = useCallback((message: string, type: 'success' | 'error' | 'info' = 'info') => {
+    const id = Math.random().toString(36).substring(2, 9);
+    setToasts((prev) => [...prev, { id, type, message }]);
+    setTimeout(() => {
+      setToasts((prev) => prev.filter((t) => t.id !== id));
+    }, 4000);
+  }, []);
+
+  const requestConfirm = (title: string, message: string, onConfirm: () => void, confirmLabel = 'Delete Permanently') => {
+    setConfirmDialog({
+      isOpen: true,
+      title,
+      message,
+      confirmLabel,
+      onConfirm: () => {
+        setConfirmDialog(null);
+        onConfirm();
+      },
+    });
+  };
+
+  useEffect(() => {
+    if (!confirmDialog?.isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setConfirmDialog(null);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [confirmDialog]);
 
   const load = useCallback(async () => {
     if (!supabase) return;
@@ -265,9 +564,31 @@ export function AdminDashboard() {
     setSkills(sk.data ?? []);
     setEducation(ed.data ?? []);
     setCategories(ca.data ?? []);
-    setTechnologies(te.data ?? []);
     setCertificates((ce.data ?? []).map((certificate) => ({ ...certificate, issue_date: certificate.issue_date ?? '' })));
     setTestimonials(tm.data ?? []);
+
+    // Auto-detect any technologies in skills that are not yet in the technologies table
+    const existingTech = te.data ?? [];
+    const skillNames = skillTechnologyNames(sk.data ?? []);
+    const existingSlugs = new Set(existingTech.map((t) => t.slug));
+    const existingNames = new Set(existingTech.map((t) => t.name.toLowerCase().trim()));
+    const missing = skillNames.filter((name) => {
+      const slug = technologySlug(name);
+      return !existingSlugs.has(slug) && !existingNames.has(name.toLowerCase().trim());
+    });
+
+    if (missing.length > 0) {
+      const toInsert = missing.map((name, i) => ({
+        slug: technologySlug(name),
+        name,
+        icon: curatedIcon(name) || '',
+        sort_order: existingTech.length + i + 1,
+      }));
+      const { data: inserted } = await client.from('technologies').insert(toInsert).select('*');
+      setTechnologies([...existingTech, ...(inserted ?? [])]);
+    } else {
+      setTechnologies(existingTech);
+    }
 
     const parsed: Record<string, boolean> = {
       testimonials_button_visible: true,
@@ -303,7 +624,66 @@ export function AdminDashboard() {
     setSaving(true);
     const { error } = await supabase.from('profile').upsert({ ...profile, id: 1 });
     setSaving(false);
-    if (error) alert(error.message); else flash('Profile saved ✓');
+    if (error) {
+      showToast(error.message, 'error');
+    } else {
+      showToast('Profile saved successfully ✓', 'success');
+    }
+  }
+
+  async function upsertTechnology(tech: { name: string; icon: string; originalName?: string }): Promise<void> {
+    if (!supabase) return;
+    const name = tech.name.trim();
+    if (!name) return;
+    const slug = technologySlug(name);
+
+    // Flexible technology lookup matching originalName, current name, or slug
+    const existing = technologies.find(
+      (t) =>
+        (tech.originalName && (isSameTechnology(t.name, tech.originalName) || isSameTechnology(t.slug, tech.originalName))) ||
+        isSameTechnology(t.name, name) ||
+        isSameTechnology(t.slug, slug)
+    );
+
+    if (existing) {
+      const shouldUpdateIcon = tech.icon && existing.icon !== tech.icon;
+      const shouldUpdateName = existing.name !== name;
+
+      if (shouldUpdateIcon || shouldUpdateName) {
+        const updatedIcon = tech.icon || existing.icon;
+        const { error } = await supabase
+          .from('technologies')
+          .update({ icon: updatedIcon, name })
+          .eq('id', existing.id);
+        if (error) {
+          showToast(`Could not update technology: ${error.message}`, 'error');
+        } else {
+          showToast(`Updated ${name} icon ✓`, 'success');
+          setTechnologies((prev) =>
+            prev.map((t) => (t.id === existing.id ? { ...t, icon: updatedIcon, name } : t))
+          );
+        }
+      }
+    } else {
+      const nextOrder = technologies.length + 1;
+      const { data, error } = await supabase
+        .from('technologies')
+        .insert({
+          slug,
+          name,
+          icon: tech.icon || curatedIcon(name) || '',
+          sort_order: nextOrder,
+        })
+        .select('*')
+        .maybeSingle();
+
+      if (error) {
+        showToast(`Could not save technology: ${error.message}`, 'error');
+      } else if (data) {
+        showToast(`Added ${name} to technologies ✓`, 'success');
+        setTechnologies((prev) => [...prev, data]);
+      }
+    }
   }
 
   async function saveRow(table: string, row: Record<string, unknown>) {
@@ -311,7 +691,9 @@ export function AdminDashboard() {
     setSaving(true);
     try {
       const { id, ...values } = row;
-      if (table === 'skill_groups') values.items_ar = values.items_en;
+      if (table === 'skill_groups') {
+        values.items_ar = values.items_ar || values.items_en;
+      }
       const query = id == null
         ? supabase.from(table).insert(values)
         : supabase.from(table).update(values).eq('id', id);
@@ -321,10 +703,13 @@ export function AdminDashboard() {
       if (table === 'skill_groups') {
         await syncTechnologies();
       }
-      flash('Saved ✓');
+      showToast('Saved successfully ✓', 'success');
       await refreshTable(table);
+      if (table === 'skill_groups') {
+        await refreshTable('technologies');
+      }
     } catch (saveError) {
-      alert(errorMessage(saveError));
+      showToast(errorMessage(saveError), 'error');
     } finally {
       setSaving(false);
     }
@@ -334,7 +719,7 @@ export function AdminDashboard() {
     if (!supabase) return;
     const [groupsResult, existingResult] = await Promise.all([
       supabase.from('skill_groups').select('items_en,items_ar').order('sort_order'),
-      supabase.from('technologies').select('id,slug,name'),
+      supabase.from('technologies').select('id,slug,name,icon,sort_order'),
     ]);
     if (groupsResult.error) throw new Error(`Could not read skills: ${errorMessage(groupsResult.error)}`);
     if (existingResult.error) throw new Error(`Could not read technologies: ${errorMessage(existingResult.error)}`);
@@ -342,32 +727,27 @@ export function AdminDashboard() {
     const names = skillTechnologyNames(groupsResult.data ?? []);
     const existing = existingResult.data ?? [];
 
-    const matchedIds = new Set<number>();
-    const matchedTechnology = (slug: string, name: string) => (existing ?? []).find((technology) =>
-      technology.slug === slug || technologySlug(technology.name) === technologySlug(name)
-    );
-    for (const name of names) {
-      const current = matchedTechnology(technologySlug(name), name);
-      if (current) matchedIds.add(current.id);
-    }
+    const existingSlugs = new Set((existing ?? []).map((t) => t.slug));
+    const existingNames = new Set((existing ?? []).map((t) => t.name.toLowerCase().trim()));
 
-    const staleIds = (existing ?? []).map((t) => t.id).filter((id) => !matchedIds.has(id));
-    const records = names.map((name, index) => {
-      const current = matchedTechnology(technologySlug(name), name);
-      return {
-        ...(current ? { id: current.id } : {}),
+    const missingNames = names.filter((name) => {
+      const slug = technologySlug(name);
+      return !existingSlugs.has(slug) && !existingNames.has(name.toLowerCase().trim());
+    });
+
+    if (missingNames.length > 0) {
+      const recordsToInsert = missingNames.map((name, index) => ({
         slug: technologySlug(name),
         name,
-        icon: current ? undefined : '',
-        sort_order: index + 1,
-      };
-    });
-    const operations: PromiseLike<{ error: unknown }>[] = [];
-    if (staleIds.length > 0) operations.push(supabase.from('technologies').delete().in('id', staleIds));
-    if (records.length > 0) operations.push(supabase.from('technologies').upsert(records));
-    const results = await Promise.all(operations);
-    const failed = results.find((result) => result.error);
-    if (failed?.error) throw new Error(`Could not synchronize technologies: ${errorMessage(failed.error)}`);
+        icon: curatedIcon(name) || '',
+        sort_order: (existing?.length ?? 0) + index + 1,
+      }));
+
+      const { error } = await supabase
+        .from('technologies')
+        .insert(recordsToInsert);
+      if (error) throw new Error(`Could not synchronize technologies: ${errorMessage(error)}`);
+    }
   }
 
   async function refreshTable(table: string) {
@@ -397,18 +777,37 @@ export function AdminDashboard() {
   }
 
   async function deleteRow(table: string, id: number) {
-    if (!supabase || !confirm('Delete this item permanently?')) return;
+    if (!supabase) return;
     const { error } = await supabase.from(table).delete().eq('id', id);
-    if (error) alert(error.message); else { flash('Deleted'); load(); }
+    if (error) {
+      showToast(error.message, 'error');
+    } else {
+      showToast('Deleted permanently ✓', 'success');
+      if (table === 'skill_groups') {
+        await syncTechnologies();
+        await refreshTable('technologies');
+      }
+      load();
+    }
   }
+
+  const handleDeleteClick = (table: string, id: number, label?: string) => {
+    requestConfirm(
+      'Confirm Deletion',
+      `Are you sure you want to permanently delete ${label ? `"${label}"` : 'this record'}? This action cannot be undone.`,
+      () => deleteRow(table, id),
+      'Delete Permanently'
+    );
+  };
 
   /* Testimonials moderation controls */
   async function setTestimonialStatus(id: number, status: 'approved' | 'rejected' | 'pending') {
     if (!supabase) return;
     const { error } = await supabase.from('testimonials').update({ status }).eq('id', id);
-    if (error) alert(error.message);
-    else {
-      flash(`Testimonial ${status} ✓`);
+    if (error) {
+      showToast(error.message, 'error');
+    } else {
+      showToast(`Testimonial ${status} ✓`, 'success');
       refreshTable('testimonials');
     }
   }
@@ -422,10 +821,10 @@ export function AdminDashboard() {
       updated_at: new Date().toISOString(),
     });
     if (error) {
-      alert(`Could not save setting: ${error.message}`);
+      showToast(`Could not save setting: ${error.message}`, 'error');
       setSiteSettings((prev) => ({ ...prev, [key]: !value }));
     } else {
-      flash('Setting updated ✓');
+      showToast('Setting updated ✓', 'success');
     }
   }
 
@@ -443,120 +842,76 @@ export function AdminDashboard() {
       </div>
     );
   }
-  if (!ready) return <div className="admin-page"><div className="admin-card"><p>Authenticating admin workspace…</p></div></div>;
+  if (!ready) return <AdminDashboardSkeleton adminLocale={adminLocale} />;
 
   const up = (key: keyof Profile) => (v: string) => setProfile((s) => ({ ...s, [key]: v }));
 
-  const navGroups: { label: string; items: { key: Tab; title: string; count?: number; icon: string }[] }[] = [
-    {
-      label: 'Core Portfolio',
-      items: [
-        { key: 'profile', title: 'Profile Info', icon: '👤' },
-        { key: 'projects', title: 'Projects', count: projects.length, icon: '💼' },
-        { key: 'categories', title: 'Categories', count: categories.length, icon: '🏷️' },
-        { key: 'technologies', title: 'Tech Stack', count: technologies.length, icon: '⚡' },
-      ],
-    },
-    {
-      label: 'Showcase & Social Proof',
-      items: [
-        { key: 'certificates', title: 'Certificates', count: certificates.length, icon: '🎓' },
-        {
-          key: 'testimonials',
-          title: 'Client Reviews',
-          count: testimonials.filter((t) => t.status === 'pending').length || testimonials.length,
-          icon: '💬',
-        },
-      ],
-    },
-    {
-      label: 'Experience & Background',
-      items: [
-        { key: 'experiences', title: 'Work Experience', count: experiences.length, icon: '⏳' },
-        { key: 'skills', title: 'Skill Groups', count: skills.length, icon: '🛠️' },
-        { key: 'education', title: 'Education & Courses', count: education.length, icon: '🏛️' },
-      ],
-    },
-    {
-      label: 'System & Configuration',
-      items: [
-        { key: 'settings', title: 'Site Settings', icon: '⚙️' },
-      ],
-    },
-  ];
+  const counts = {
+    projects: projects.length,
+    categories: categories.length,
+    certificates: certificates.length,
+    testimonialsPending: testimonials.filter((t) => t.status === 'pending').length,
+    testimonialsTotal: testimonials.length,
+    experiences: experiences.length,
+    skills: skills.length,
+    education: education.length,
+  };
+
+  const handleSignOut = async () => {
+    await supabase?.auth.signOut();
+    navigate('/admin');
+  };
+
+  const getTabTitle = (currentTab: AdminTab) => {
+    const dict = adminI18n[adminLocale];
+    switch (currentTab) {
+      case 'overview': return dict.tabOverview;
+      case 'profile': return dict.tabProfile;
+      case 'projects': return dict.tabProjects;
+      case 'categories': return dict.tabCategories;
+      case 'certificates': return dict.tabCertificates;
+      case 'testimonials': return dict.tabTestimonials;
+      case 'experiences': return dict.tabExperience;
+      case 'skills': return dict.tabSkills;
+      case 'education': return dict.tabEducation;
+      case 'settings': return dict.tabSettings;
+      default: return currentTab;
+    }
+  };
 
   return (
-    <div className="admin-shell">
-      {/* Mobile topbar */}
-      <div className="admin-mobile-bar">
-        <button className="admin-burger" onClick={() => setSidebarOpen(!sidebarOpen)} aria-label="Toggle navigation">
-          ☰
-        </button>
-        <span className="admin-mobile-title">Taha Portfolio Admin</span>
-        <Link to="/" className="admin-exit-link">Exit ↗</Link>
-      </div>
+    <div className="admin-shell" dir={adminLocale === 'ar' ? 'rtl' : 'ltr'}>
+      {/* Refactored Slim Bento Sidebar */}
+      <AdminSidebar
+        currentTab={tab}
+        onSelectTab={(selected) => setTab(selected)}
+        isOpen={sidebarOpen}
+        onClose={() => setSidebarOpen(false)}
+        locale={adminLocale}
+        counts={counts}
+        adminEmail={adminUserEmail}
+        onSignOut={handleSignOut}
+      />
 
-      {/* Persistent Sidebar */}
-      <aside className={`admin-sidebar ${sidebarOpen ? 'is-open' : ''}`}>
-        <div className="admin-sidebar-header">
-          <Link to="/" className="admin-back-btn">← Public Portfolio</Link>
-          <div className="admin-brand-box">
-            <span className="admin-badge-dot" />
-            <h1 className="admin-brand-title">Control Center</h1>
-          </div>
-        </div>
+      {/* Main App Stage with Bento Frame & Topbar */}
+      <div className="admin-bento-frame">
+        <AdminTopBar
+          onToggleSidebar={() => setSidebarOpen((prev) => !prev)}
+          locale={adminLocale}
+          onToggleLocale={toggleAdminLocale}
+          searchQuery={searchFilter}
+          onSearchChange={setSearchFilter}
+          pendingReviewsCount={counts.testimonialsPending}
+          onNavigateToReviews={() => setTab('testimonials')}
+        />
 
-        <nav className="admin-sidebar-nav" aria-label="Administrative Navigation">
-          {navGroups.map((group) => (
-            <div key={group.label} className="admin-nav-group">
-              <span className="admin-group-label">{group.label}</span>
-              {group.items.map((item) => (
-                <button
-                  key={item.key}
-                  className={`admin-nav-item ${tab === item.key ? 'is-active' : ''}`}
-                  onClick={() => { setTab(item.key); setSidebarOpen(false); }}
-                >
-                  <span className="nav-item-icon" aria-hidden="true">{item.icon}</span>
-                  <span className="nav-item-title">{item.title}</span>
-                  {item.count != null && (
-                    <span className={`nav-item-count ${item.key === 'testimonials' && testimonials.some((t) => t.status === 'pending') ? 'count-pending' : ''}`}>
-                      {item.count}
-                    </span>
-                  )}
-                </button>
-              ))}
+        <main className="admin-main-stage">
+          <header className="admin-stage-header">
+            <div>
+              <h2 className="admin-stage-title">{getTabTitle(tab)}</h2>
+              <span className="admin-stage-sub">{adminI18n[adminLocale].systemLiveStatus}</span>
             </div>
-          ))}
-        </nav>
-
-        <div className="admin-sidebar-footer">
-          <div className="admin-user-pill" title={adminUserEmail}>
-            <span className="admin-avatar">TA</span>
-            <span className="admin-email-text">{adminUserEmail}</span>
-          </div>
-          <button
-            className="admin-signout-btn"
-            onClick={async () => {
-              await supabase?.auth.signOut();
-              navigate('/admin');
-            }}
-          >
-            Sign out
-          </button>
-        </div>
-      </aside>
-
-      {/* Main Content Area */}
-      <main className="admin-main-stage">
-        <header className="admin-stage-header">
-          <div>
-            <h2 className="admin-stage-title">
-              {navGroups.flatMap((g) => g.items).find((i) => i.key === tab)?.title}
-            </h2>
-            <span className="admin-stage-sub">Database Synchronized with Supabase</span>
-          </div>
-          {saved && <div className="admin-saved-toast">{saved}</div>}
-        </header>
+          </header>
 
         {loadError && (
           <div className="admin-error-banner" role="alert">
@@ -566,51 +921,51 @@ export function AdminDashboard() {
         )}
 
         <div className="admin-stage-body">
+          {tab === 'overview' && (
+            <AdminOverviewBento
+              locale={adminLocale}
+              onNavigateTab={(targetTab) => setTab(targetTab)}
+              projects={projects}
+              skills={skills}
+              technologies={technologies}
+              certificates={certificates}
+              testimonials={testimonials}
+              experiences={experiences}
+              siteSettings={siteSettings}
+            />
+          )}
+
           {tab === 'profile' && (
-            <section className="admin-panel">
-              <div className="admin-panel-head">
-                <h3>Bio & Profile Details</h3>
-                <button className="primary-action" disabled={saving} onClick={saveProfile}>
-                  {saving ? 'Saving…' : 'Save Changes'} <span aria-hidden="true">✓</span>
-                </button>
-              </div>
-
-              <ImagePicker value={profile.photo_url} folder="avatar" onChange={up('photo_url')} />
-
-              <div className="af-grid">
-                <Field label="Name (EN)" value={profile.name_en} onChange={up('name_en')} />
-                <Field label="الاسم (عربي)" value={profile.name_ar} onChange={up('name_ar')} />
-                <Field label="Job title (EN)" value={profile.role_en} onChange={up('role_en')} />
-                <Field label="المسمى الوظيفي (عربي)" value={profile.role_ar} onChange={up('role_ar')} />
-                <Field label="Statement (EN) — two lines" value={profile.statement_en} onChange={up('statement_en')} textarea />
-                <Field label="الجملة التعريفية (عربي)" value={profile.statement_ar} onChange={up('statement_ar')} textarea />
-                <Field label="Intro (EN)" value={profile.intro_en} onChange={up('intro_en')} textarea />
-                <Field label="نبذة قصيرة (عربي)" value={profile.intro_ar} onChange={up('intro_ar')} textarea />
-                <Field label="About me (EN)" value={profile.about_en} onChange={up('about_en')} textarea />
-                <Field label="عني (عربي)" value={profile.about_ar} onChange={up('about_ar')} textarea />
-                <Field label="Location (EN)" value={profile.location_en} onChange={up('location_en')} />
-                <Field label="الموقع (عربي)" value={profile.location_ar} onChange={up('location_ar')} />
-                <Field label="Availability (EN)" value={profile.available_en} onChange={up('available_en')} />
-                <Field label="حالة التوفر (عربي)" value={profile.available_ar} onChange={up('available_ar')} />
-                <Field label="Years in footer" value={profile.years_label} onChange={up('years_label')} />
-                <Field label="Email" value={profile.email} onChange={up('email')} />
-                <Field label="Phone" value={profile.phone} onChange={up('phone')} />
-                <Field label="GitHub URL" value={profile.github} onChange={up('github')} />
-                <Field label="LinkedIn URL" value={profile.linkedin} onChange={up('linkedin')} />
-              </div>
-            </section>
+            <AdminProfileManager
+              locale={adminLocale}
+              profile={profile}
+              saving={saving}
+              onSave={saveProfile}
+              onChangeField={up}
+              renderImagePicker={(value, folder, onChange) => (
+                <ImagePicker
+                  value={value}
+                  folder={folder}
+                  onChange={onChange}
+                  hidePreview={true}
+                  buttonLabel={adminLocale === 'ar' ? 'تغيير الصورة الشخصية' : 'Change Profile Photo'}
+                />
+              )}
+            />
           )}
 
           {tab === 'projects' && (
             <CollectionEditor<Project>
-              title="Projects / المشاريع"
+              title={adminLocale === 'ar' ? 'المشاريع' : 'Projects'}
               rows={projects}
+              searchFilter={searchFilter}
+              locale={adminLocale}
               makeNew={() => ({
                 name: '', year: '2026', category: 'fullstack', headline_en: '', headline_ar: '',
                 summary_en: '', summary_ar: '', tags: ['React', 'TypeScript'], demo_url: '', code_url: '', image_url: '', sort_order: projects.length + 1,
               })}
               onSave={(r) => saveRow('projects', r as unknown as Record<string, unknown>)}
-              onDelete={(id) => deleteRow('projects', id)}
+              onRequestDelete={(row) => handleDeleteClick('projects', row.id!, row.name)}
               render={(row, set) => (
                 <div className="af-grid">
                   <Field label="Name" value={row.name} onChange={set('name')} />
@@ -627,7 +982,16 @@ export function AdminDashboard() {
                   <Field label="العنوان التسويقي (عربي)" value={row.headline_ar} onChange={set('headline_ar')} />
                   <Field label="Summary (EN)" value={row.summary_en} onChange={set('summary_en')} textarea />
                   <Field label="الوصف الكامل (عربي)" value={row.summary_ar} onChange={set('summary_ar')} textarea />
-                  <Field label="Tags / Technologies (comma separated)" value={row.tags.join(', ')} onChange={set('tags')} />
+
+                  {/* Interactive Technology Selector with Icon Picker */}
+                  <TechnologyListEditor
+                    label="Technologies & Stack / التقنيات المستخدمة"
+                    technologies={technologies}
+                    selectedNames={row.tags || []}
+                    onChange={(newTags) => set('tags')(newTags)}
+                    onUpsertTechnology={upsertTechnology}
+                  />
+
                   <Field label="Live demo URL" value={row.demo_url} onChange={set('demo_url')} />
                   <Field label="Code repository URL" value={row.code_url} onChange={set('code_url')} />
                   <ImagePicker value={row.image_url} folder="projects" onChange={set('image_url')} />
@@ -641,11 +1005,13 @@ export function AdminDashboard() {
 
           {tab === 'categories' && (
             <CollectionEditor<ProjectCategoryOption>
-              title="Project Categories"
+              title={adminLocale === 'ar' ? 'تصنيفات المشاريع' : 'Project Categories'}
               rows={categories}
+              searchFilter={searchFilter}
+              locale={adminLocale}
               makeNew={() => ({ slug: '', name_en: '', name_ar: '', sort_order: categories.length + 1 })}
               onSave={(row) => saveRow('project_categories', row as unknown as Record<string, unknown>)}
-              onDelete={(id) => deleteRow('project_categories', id)}
+              onRequestDelete={(row) => handleDeleteClick('project_categories', row.id!, row.name_en)}
               render={(row, set) => (
                 <div className="af-grid">
                   <Field label="Category key / slug" value={row.slug} onChange={set('slug')} />
@@ -659,42 +1025,18 @@ export function AdminDashboard() {
             />
           )}
 
-          {tab === 'technologies' && (
-            <CollectionEditor<Technology>
-              title="Technologies"
-              rows={technologies}
-              makeNew={() => ({ slug: '', name: '', icon: '', sort_order: technologies.length + 1 })}
-              onSave={(row) => saveRow('technologies', row as unknown as Record<string, unknown>)}
-              onDelete={(id) => deleteRow('technologies', id)}
-              render={(row, set) => (
-                <div className="af-grid">
-                  <div className="af">
-                    <span>Name</span>
-                    <strong>{row.name}</strong>
-                  </div>
-                  <div className="af">
-                    <span>Icon Status</span>
-                    <strong>Detected automatically from official tech libraries</strong>
-                  </div>
-                  <Field label="Sort order" value={String(row.sort_order)} onChange={(v) => set('sort_order')(String(Number(v) || 0))} />
-                </div>
-              )}
-              afterSave={setTechnologies}
-              table="technologies"
-              allowAdd={false}
-            />
-          )}
-
           {tab === 'certificates' && (
             <CollectionEditor<Certificate>
-              title="Certificates & Credentials (PHASE 6)"
+              title={adminLocale === 'ar' ? 'الشهادات والاعتمادات' : 'Certificates & Credentials'}
               rows={certificates}
+              searchFilter={searchFilter}
+              locale={adminLocale}
               makeNew={() => ({
                 title: '', issuer: '', issue_date: '2026', image_url: '', verification_url: '',
                 is_published: true, sort_order: certificates.length + 1,
               })}
               onSave={(row) => saveRow('certificates', row as unknown as Record<string, unknown>)}
-              onDelete={(id) => deleteRow('certificates', id)}
+              onRequestDelete={(row) => handleDeleteClick('certificates', row.id!, row.title)}
               render={(row, set) => (
                 <div className="af-grid">
                   <Field label="Title" value={row.title} onChange={set('title')} />
@@ -703,7 +1045,7 @@ export function AdminDashboard() {
                   <ImagePicker value={row.image_url} folder="certificates" onChange={set('image_url')} />
                   <Field label="Verification URL" value={row.verification_url} onChange={set('verification_url')} />
                   <label className="af af-checkbox">
-                    <input type="checkbox" checked={row.is_published} onChange={(e) => set('is_published')(String(e.target.checked))} />
+                    <input type="checkbox" checked={row.is_published} onChange={(e) => set('is_published')(e.target.checked)} />
                     <span>Published publicly in marquee</span>
                   </label>
                   <Field label="Sort order" value={String(row.sort_order)} onChange={(v) => set('sort_order')(String(Number(v) || 0))} />
@@ -715,88 +1057,26 @@ export function AdminDashboard() {
           )}
 
           {tab === 'testimonials' && (
-            <section className="admin-panel">
-              <div className="admin-panel-head">
-                <div>
-                  <h3>Client Feedback & Moderation (PHASE 3)</h3>
-                  <span className="admin-panel-sub">Review visitor feedback, approve, or reject submissions</span>
-                </div>
-                <div className="visibility-toggle-box">
-                  <label className="toggle-switch">
-                    <input
-                      type="checkbox"
-                      checked={siteSettings.testimonials_button_visible ?? true}
-                      onChange={(e) => toggleSetting('testimonials_button_visible', e.target.checked)}
-                    />
-                    <span className="toggle-slider" />
-                  </label>
-                  <span>"Share Feedback" Button: <strong>{siteSettings.testimonials_button_visible !== false ? 'Visible' : 'Hidden'}</strong></span>
-                </div>
-              </div>
-
-              <div className="testimonials-admin-list">
-                {testimonials.map((item) => (
-                  <div key={item.id} className={`testimonial-admin-card status-${item.status}`}>
-                    <div className="testimonial-admin-top">
-                      <div className="testimonial-admin-client">
-                        <h4>{item.client_name}</h4>
-                        <span className="testimonial-client-meta">
-                          {[item.client_role, item.client_company].filter(Boolean).join(' · ')}
-                        </span>
-                      </div>
-                      <div className="testimonial-admin-badges">
-                        <span className="rating-pill">{'★'.repeat(item.rating || 5)}</span>
-                        <span className={`status-badge badge-${item.status}`}>
-                          {item.status.toUpperCase()}
-                        </span>
-                      </div>
-                    </div>
-
-                    <p className="testimonial-admin-body">“{item.content}”</p>
-
-                    <div className="testimonial-admin-actions">
-                      {item.status !== 'approved' && (
-                        <button
-                          className="primary-action btn-sm btn-approve"
-                          onClick={() => setTestimonialStatus(item.id!, 'approved')}
-                        >
-                          Approve ✓
-                        </button>
-                      )}
-                      {item.status !== 'rejected' && (
-                        <button
-                          className="text-action btn-sm btn-reject"
-                          onClick={() => setTestimonialStatus(item.id!, 'rejected')}
-                        >
-                          Reject ✕
-                        </button>
-                      )}
-                      <button
-                        className="text-action btn-sm btn-danger"
-                        onClick={() => deleteRow('testimonials', item.id!)}
-                      >
-                        Delete
-                      </button>
-                    </div>
-                  </div>
-                ))}
-
-                {testimonials.length === 0 && (
-                  <div className="admin-empty-state">
-                    <p>No testimonials received yet. When visitors submit reviews, they will appear here pending moderation.</p>
-                  </div>
-                )}
-              </div>
-            </section>
+            <AdminTestimonialsManager
+              locale={adminLocale}
+              testimonials={testimonials}
+              searchFilter={searchFilter}
+              onSetStatus={setTestimonialStatus}
+              onRequestDelete={(item) => handleDeleteClick('testimonials', item.id!, item.client_name)}
+              testimonialsButtonVisible={siteSettings.testimonials_button_visible ?? true}
+              onToggleTestimonialsButton={(visible) => toggleSetting('testimonials_button_visible', visible)}
+            />
           )}
 
           {tab === 'experiences' && (
             <CollectionEditor<Experience>
-              title="Experience / الخبرات"
+              title={adminLocale === 'ar' ? 'الخبرات المهنية' : 'Experience & Roles'}
               rows={experiences}
+              searchFilter={searchFilter}
+              locale={adminLocale}
               makeNew={() => ({ date_en: '', date_ar: '', company_en: '', company_ar: '', role_en: '', role_ar: '', body_en: '', body_ar: '', sort_order: experiences.length + 1 })}
               onSave={(r) => saveRow('experiences', r as unknown as Record<string, unknown>)}
-              onDelete={(id) => deleteRow('experiences', id)}
+              onRequestDelete={(row) => handleDeleteClick('experiences', row.id!, row.company_en)}
               render={(row, set) => (
                 <div className="af-grid">
                   <Field label="Dates (EN)" value={row.date_en} onChange={set('date_en')} />
@@ -817,19 +1097,40 @@ export function AdminDashboard() {
 
           {tab === 'skills' && (
             <CollectionEditor<SkillGroup>
-              title="Skill groups / المهارات"
+              title={adminLocale === 'ar' ? 'مجموعات المهارات' : 'Skill Groups'}
               rows={skills}
+              searchFilter={searchFilter}
+              locale={adminLocale}
               makeNew={() => ({ title_en: '', title_ar: '', items_en: '', items_ar: '', sort_order: skills.length + 1 })}
               onSave={(r) => saveRow('skill_groups', r as unknown as Record<string, unknown>)}
-              onDelete={(id) => deleteRow('skill_groups', id)}
-              render={(row, set) => (
-                <div className="af-grid">
-                  <Field label="Title (EN)" value={row.title_en} onChange={set('title_en')} />
-                  <Field label="العنوان (عربي)" value={row.title_ar} onChange={set('title_ar')} />
-                  <Field label="Items (EN)" value={row.items_en} onChange={set('items_en')} />
-                  <Field label="Sort order" value={String(row.sort_order)} onChange={(v) => set('sort_order')(String(Number(v) || 0))} />
-                </div>
-              )}
+              onRequestDelete={(row) => handleDeleteClick('skill_groups', row.id!, row.title_en)}
+              render={(row, set) => {
+                const names = (row.items_en || '')
+                  .split(/[·•,،;\n|/]+/)
+                  .map((s) => s.trim())
+                  .filter(Boolean);
+                return (
+                  <div className="af-grid">
+                    <Field label="Skill Group Title (EN)" value={row.title_en} onChange={set('title_en')} placeholder="e.g. Frontend Development" />
+                    <Field label="عنوان مجموعة المهارات (عربي)" value={row.title_ar} onChange={set('title_ar')} placeholder="مثال: تطوير الواجهات الأمامية" />
+
+                    {/* Interactive Technology Selector with Icon Picker */}
+                    <TechnologyListEditor
+                      label="Technologies & Tools / التقنيات والأدوات"
+                      technologies={technologies}
+                      selectedNames={names}
+                      onChange={(newNames) => {
+                        const joined = newNames.join(' · ');
+                        set('items_en')(joined);
+                        set('items_ar')(joined);
+                      }}
+                      onUpsertTechnology={upsertTechnology}
+                    />
+
+                    <Field label="Sort order" value={String(row.sort_order)} onChange={(v) => set('sort_order')(String(Number(v) || 0))} />
+                  </div>
+                );
+              }}
               afterSave={(rows) => setSkills(rows)}
               table="skill_groups"
             />
@@ -837,11 +1138,13 @@ export function AdminDashboard() {
 
           {tab === 'education' && (
             <CollectionEditor<Education>
-              title="Education & courses / التعليم"
+              title={adminLocale === 'ar' ? 'المؤهلات والشهادات الدراسية' : 'Education & Credentials'}
               rows={education}
+              searchFilter={searchFilter}
+              locale={adminLocale}
               makeNew={() => ({ kind: 'course', title_en: '', title_ar: '', org_en: '', org_ar: '', date_en: '', date_ar: '', details_en: '', details_ar: '', sort_order: education.length + 1 })}
               onSave={(r) => saveRow('education', r as unknown as Record<string, unknown>)}
-              onDelete={(id) => deleteRow('education', id)}
+              onRequestDelete={(row) => handleDeleteClick('education', row.id!, row.title_en)}
               render={(row, set) => (
                 <div className="af-grid">
                   <label className="af">
@@ -868,115 +1171,72 @@ export function AdminDashboard() {
           )}
 
           {tab === 'settings' && (
-            <section className="admin-panel">
-              <div className="admin-panel-head">
-                <div>
-                  <h3>Global Portfolio Settings</h3>
-                  <span className="admin-panel-sub">Manage live portfolio visibility and interactive section toggles</span>
-                </div>
-              </div>
-              <div className="settings-card">
-                <div className="setting-row">
-                  <div>
-                    <h4>Visitor "Share Feedback" Button</h4>
-                    <p className="setting-description">Show or hide the public button allowing clients and visitors to open the testimonial submission modal.</p>
-                  </div>
-                  <label className="toggle-switch">
-                    <input
-                      type="checkbox"
-                      checked={siteSettings.testimonials_button_visible !== false}
-                      onChange={(e) => toggleSetting('testimonials_button_visible', e.target.checked)}
-                    />
-                    <span className="toggle-slider" />
-                  </label>
-                </div>
-
-                <div className="setting-divider" />
-
-                <div className="setting-row">
-                  <div>
-                    <h4>Selected Work / Projects Section</h4>
-                    <p className="setting-description">Controls visibility of the interactive projects catalog on the live portfolio.</p>
-                  </div>
-                  <label className="toggle-switch">
-                    <input
-                      type="checkbox"
-                      checked={siteSettings.section_work_visible !== false}
-                      onChange={(e) => toggleSetting('section_work_visible', e.target.checked)}
-                    />
-                    <span className="toggle-slider" />
-                  </label>
-                </div>
-
-                <div className="setting-row">
-                  <div>
-                    <h4>About & Skills Section</h4>
-                    <p className="setting-description">Controls visibility of the statement, skills breakdown, and technical profile.</p>
-                  </div>
-                  <label className="toggle-switch">
-                    <input
-                      type="checkbox"
-                      checked={siteSettings.section_about_visible !== false}
-                      onChange={(e) => toggleSetting('section_about_visible', e.target.checked)}
-                    />
-                    <span className="toggle-slider" />
-                  </label>
-                </div>
-
-                <div className="setting-row">
-                  <div>
-                    <h4>Career Experience Section</h4>
-                    <p className="setting-description">Controls visibility of the chronological career timeline and roles.</p>
-                  </div>
-                  <label className="toggle-switch">
-                    <input
-                      type="checkbox"
-                      checked={siteSettings.section_experience_visible !== false}
-                      onChange={(e) => toggleSetting('section_experience_visible', e.target.checked)}
-                    />
-                    <span className="toggle-slider" />
-                  </label>
-                </div>
-
-                <div className="setting-row">
-                  <div>
-                    <h4>Certificates Continuous Marquee Section</h4>
-                    <p className="setting-description">Controls visibility of the automated right-to-left credentials carousel.</p>
-                  </div>
-                  <label className="toggle-switch">
-                    <input
-                      type="checkbox"
-                      checked={siteSettings.section_certificates_visible !== false}
-                      onChange={(e) => toggleSetting('section_certificates_visible', e.target.checked)}
-                    />
-                    <span className="toggle-slider" />
-                  </label>
-                </div>
-
-                <div className="setting-row">
-                  <div>
-                    <h4>Client Testimonials Section</h4>
-                    <p className="setting-description">Controls visibility of the entire client reviews section on the live portfolio.</p>
-                  </div>
-                  <label className="toggle-switch">
-                    <input
-                      type="checkbox"
-                      checked={siteSettings.section_testimonials_visible !== false}
-                      onChange={(e) => toggleSetting('section_testimonials_visible', e.target.checked)}
-                    />
-                    <span className="toggle-slider" />
-                  </label>
-                </div>
-              </div>
-            </section>
+            <AdminSiteSettingsManager
+              locale={adminLocale}
+              siteSettings={siteSettings}
+              onToggleSetting={toggleSetting}
+            />
           )}
         </div>
       </main>
+      </div> {/* .admin-bento-frame */}
+
+      {/* Modern Toast Notification Container */}
+      <div className="admin-toast-container" role="status" aria-live="polite">
+        {toasts.map((t) => (
+          <div key={t.id} className={`admin-toast-item toast-${t.type}`}>
+            <span className="toast-icon" aria-hidden="true">
+              {t.type === 'success' ? '✓' : t.type === 'error' ? '⚠' : 'ℹ'}
+            </span>
+            <span className="toast-message">{t.message}</span>
+            <button
+              type="button"
+              className="toast-close"
+              onClick={() => setToasts((prev) => prev.filter((item) => item.id !== t.id))}
+              aria-label="Close notification"
+            >
+              ✕
+            </button>
+          </div>
+        ))}
+      </div>
+
+      {/* In-App Confirmation Modal (Replaces browser confirm) */}
+      {confirmDialog && confirmDialog.isOpen && (
+        <div className="admin-modal-backdrop" onClick={() => setConfirmDialog(null)}>
+          <div
+            className="admin-confirm-modal"
+            role="dialog"
+            aria-modal="true"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="confirm-modal-icon">⚠️</div>
+            <h3 className="confirm-modal-title">{confirmDialog.title}</h3>
+            <p className="confirm-modal-message">{confirmDialog.message}</p>
+            <div className="confirm-modal-actions">
+              <button
+                type="button"
+                className="text-action"
+                onClick={() => setConfirmDialog(null)}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="primary-action btn-danger-action"
+                onClick={confirmDialog.onConfirm}
+              >
+                {confirmDialog.confirmLabel || 'Confirm'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
-/* ---------- Generic Collection Editor ---------- */
+/* ---------- Generic Collection Editor (Now with Centered Pop-up Modal) ---------- */
 
 function CollectionEditor<T extends { id?: number; sort_order: number }>(props: {
   title: string;
@@ -984,80 +1244,226 @@ function CollectionEditor<T extends { id?: number; sort_order: number }>(props: 
   table: string;
   makeNew: () => T;
   onSave: (row: T) => Promise<void>;
-  onDelete: (id: number) => Promise<void>;
-  render: (row: T, set: (key: keyof T) => (v: string) => void) => React.ReactNode;
+  onRequestDelete: (row: T) => void;
+  render: (row: T, set: (key: keyof T) => (v: unknown) => void) => React.ReactNode;
   afterSave: (rows: T[]) => void;
   allowAdd?: boolean;
+  searchFilter?: string;
+  locale?: Locale;
 }) {
   const [editing, setEditing] = useState<T | null>(null);
   const [isNew, setIsNew] = useState(false);
+  const [savingRow, setSavingRow] = useState(false);
+
+  const loc = props.locale || 'en';
+  const t = adminI18n[loc];
+
+  useEffect(() => {
+    if (!editing) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setEditing(null);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [editing]);
 
   const startEdit = (row: T) => { setEditing({ ...row }); setIsNew(false); };
   const startNew = () => { setEditing(props.makeNew()); setIsNew(true); };
 
+  const setField = (key: keyof T) => (v: unknown) => {
+    let value: unknown = v;
+    if (key === 'sort_order') value = Number(v) || 0;
+    if (key === 'is_published') value = v === 'true' || v === true;
+    if (key === 'tags' && typeof v === 'string') {
+      value = v.split(',').map((s) => s.trim()).filter(Boolean);
+    }
+    setEditing((prev) => (prev ? { ...prev, [key]: value } : prev));
+  };
+
+  // Real-time search filter
+  const query = (props.searchFilter || '').toLowerCase().trim();
+  const filteredRows = props.rows.filter((row) => {
+    if (!query) return true;
+    const stringified = JSON.stringify(row).toLowerCase();
+    return stringified.includes(query);
+  });
+
   return (
     <section className="admin-panel">
       <div className="admin-panel-head">
-        <h3>{props.title}</h3>
+        <div className="admin-panel-title-wrap">
+          <h3>{props.title}</h3>
+          <span className="admin-panel-count-pill">{props.rows.length}</span>
+        </div>
         {props.allowAdd !== false && (
-          <button className="primary-action btn-sm" onClick={startNew}>
-            + Add New Record
+          <button className="hero-primary-btn btn-sm" onClick={startNew}>
+            <Plus size={15} />
+            <span>{t.add}</span>
           </button>
         )}
       </div>
 
+      {/* Pop-up Centered Modal for Create / Edit */}
       {editing && (
-        <div className="admin-editor-drawer">
-          <div className="editor-drawer-head">
-            <h4>{isNew ? 'Create New Entry' : 'Edit Entry'}</h4>
-            <button className="text-action btn-sm" onClick={() => setEditing(null)}>Close ✕</button>
-          </div>
-          {props.render(editing, (key) => (v) => {
-            let value: unknown = v;
-            if (key === 'sort_order') value = Number(v) || 0;
-            if (key === 'is_published') value = v === 'true';
-            const arr = (editing as unknown as Record<string, unknown>)[key as string];
-            if (Array.isArray(arr)) value = v.split(',').map((s) => s.trim()).filter(Boolean);
-            setEditing({ ...editing, [key]: value });
-          })}
-          <div className="editor-actions">
-            <button
-              className="primary-action"
-              onClick={async () => {
-                await props.onSave(editing);
-                setEditing(null);
-              }}
-            >
-              {isNew ? 'Create Record' : 'Save Changes'} <span aria-hidden="true">✓</span>
-            </button>
-            <button className="text-action" onClick={() => setEditing(null)}>Cancel</button>
+        <div
+          className="admin-modal-backdrop"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setEditing(null);
+          }}
+        >
+          <div
+            className="admin-modal"
+            role="dialog"
+            aria-modal="true"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="admin-modal-head">
+              <h4>{isNew ? `${t.createTitle} (${props.title})` : `${t.editTitle} (${props.title})`}</h4>
+              <button
+                type="button"
+                className="admin-modal-close-btn"
+                onClick={() => setEditing(null)}
+                aria-label={t.close}
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <div className="admin-modal-body">
+              {props.render(editing, setField)}
+            </div>
+            <div className="admin-modal-actions">
+              <button
+                type="button"
+                className="hero-primary-btn"
+                disabled={savingRow}
+                onClick={async () => {
+                  setSavingRow(true);
+                  try {
+                    await props.onSave(editing);
+                    setEditing(null);
+                  } finally {
+                    setSavingRow(false);
+                  }
+                }}
+              >
+                <Save size={15} />
+                <span>{savingRow ? t.saving : isNew ? t.add : t.save}</span>
+              </button>
+              <button
+                type="button"
+                className="hero-secondary-btn"
+                onClick={() => setEditing(null)}
+              >
+                <span>{t.cancel}</span>
+              </button>
+            </div>
           </div>
         </div>
       )}
 
+      {/* Bento Table / Row List */}
       <ul className="admin-row-list">
-        {props.rows.map((row) => {
+        {filteredRows.map((row) => {
+          const r = row as unknown as {
+            name?: string;
+            name_en?: string;
+            name_ar?: string;
+            slug?: string;
+            company_en?: string;
+            company_ar?: string;
+            role_en?: string;
+            role_ar?: string;
+            title?: string;
+            title_en?: string;
+            title_ar?: string;
+            headline_en?: string;
+            headline_ar?: string;
+            category?: string;
+            issuer?: string;
+            icon?: string;
+            status?: string;
+            org_en?: string;
+          };
+
+          // Smart label extraction supporting categories (name_en/name_ar), projects, experiences, etc.
           const label =
-            (row as unknown as { name?: string }).name ||
-            (row as unknown as { company_en?: string }).company_en ||
-            (row as unknown as { title?: string }).title ||
-            (row as unknown as { title_en?: string }).title_en ||
+            (loc === 'ar'
+              ? (r.name_ar || r.name || r.name_en)
+              : (r.name_en || r.name || r.name_ar)) ||
+            (loc === 'ar'
+              ? (r.role_ar || r.role_en || r.company_ar)
+              : (r.role_en || r.role_ar || r.company_en)) ||
+            (loc === 'ar'
+              ? (r.title_ar || r.title_en || r.title)
+              : (r.title_en || r.title_ar || r.title)) ||
+            r.slug ||
             '#' + row.id;
+
+          const subLabel =
+            props.table === 'project_categories'
+              ? (r.slug ? `slug: ${r.slug}${r.name_en && r.name_ar ? ` · ${loc === 'ar' ? r.name_en : r.name_ar}` : ''}` : '')
+              : (loc === 'ar' ? (r.company_ar || r.company_en) : (r.company_en || r.company_ar)) ||
+                (loc === 'ar' ? (r.headline_ar || r.headline_en) : (r.headline_en || r.headline_ar)) ||
+                r.category ||
+                r.issuer ||
+                r.org_en ||
+                '';
+
+          const iconValue = r.icon;
+          const rowIconUrl = iconValue ? savedTechnologyIconUrl(iconValue) : null;
+
           return (
-            <li key={row.id} className="admin-row-item">
-              <span className="admin-row-title">{label}</span>
-              <div className="admin-row-actions">
-                <button className="text-action btn-sm" onClick={() => startEdit(row)}>Edit</button>
+            <li key={row.id} className="admin-bento-row">
+              <div className="row-main-meta">
+                <div className="row-icon-bubble">
+                  {rowIconUrl ? (
+                    <img src={rowIconUrl} className="row-icon-img" alt="" />
+                  ) : props.table === 'project_categories' ? (
+                    <Tag size={15} className="row-icon-teal" />
+                  ) : (
+                    <span>#{row.sort_order}</span>
+                  )}
+                </div>
+                <div className="row-text-block">
+                  <span className="row-primary-label">{label}</span>
+                  {subLabel && <span className="row-sub-label">{subLabel}</span>}
+                </div>
+              </div>
+
+              <div className="row-actions-cluster">
+                <button
+                  type="button"
+                  className="row-action-btn"
+                  onClick={() => startEdit(row)}
+                  aria-label={t.edit}
+                >
+                  <Pencil size={14} />
+                  <span>{t.edit}</span>
+                </button>
                 {row.id != null && (
-                  <button className="text-action btn-sm btn-danger" onClick={() => props.onDelete(row.id!)}>
-                    Delete
+                  <button
+                    type="button"
+                    className="row-action-btn btn-danger"
+                    onClick={() => props.onRequestDelete(row)}
+                    aria-label={t.delete}
+                  >
+                    <Trash2 size={14} />
+                    <span>{t.delete}</span>
                   </button>
                 )}
               </div>
             </li>
           );
         })}
-        {props.rows.length === 0 && <li className="admin-row-empty">No records yet — click “+ Add New Record”.</li>}
+
+        {filteredRows.length === 0 && (
+          <li className="admin-row-empty">
+            <SearchX size={28} />
+            <span>{query ? t.searchEmpty : 'No records yet'}</span>
+          </li>
+        )}
       </ul>
     </section>
   );

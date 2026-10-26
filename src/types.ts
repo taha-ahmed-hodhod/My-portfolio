@@ -52,6 +52,7 @@ export interface Project {
   demo_url: string; code_url: string;
   image_url: string;
   sort_order: number;
+  created_at?: string;
 }
 
 export interface SkillGroup {
@@ -59,6 +60,7 @@ export interface SkillGroup {
   title_en: string; title_ar: string;
   items_en: string; items_ar: string;
   sort_order: number;
+  created_at?: string;
 }
 
 export interface Education {
@@ -69,6 +71,7 @@ export interface Education {
   date_en: string; date_ar: string;
   details_en: string; details_ar: string;
   sort_order: number;
+  created_at?: string;
 }
 
 export interface Certificate {
@@ -80,6 +83,7 @@ export interface Certificate {
   verification_url: string;
   is_published: boolean;
   sort_order: number;
+  created_at?: string;
 }
 
 export interface Testimonial {
