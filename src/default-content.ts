@@ -62,6 +62,7 @@ export const defaultData: PortfolioData = {
     linkedin: 'https://www.linkedin.com/',
     photo_url: '',
     years_label: '2024 — 2026',
+    cv_url: '',
   },
   experiences: [
     {

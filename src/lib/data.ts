@@ -51,20 +51,46 @@ async function fetchRemote(): Promise<PortfolioData> {
   };
 }
 
+let inFlightPromise: Promise<PortfolioData> | null = null;
+let cachedData: PortfolioData | null = null;
+
+export function invalidatePortfolioCache() {
+  cachedData = null;
+  inFlightPromise = null;
+}
+
+async function fetchRemoteDeduplicated(): Promise<PortfolioData> {
+  if (inFlightPromise) return inFlightPromise;
+  inFlightPromise = fetchRemote()
+    .then((result) => {
+      cachedData = result;
+      inFlightPromise = null;
+      return result;
+    })
+    .catch((err) => {
+      inFlightPromise = null;
+      throw err;
+    });
+  return inFlightPromise;
+}
+
 export function usePortfolio() {
-  const [data, setData] = useState<PortfolioData | null>(null);
+  const [data, setData] = useState<PortfolioData | null>(cachedData);
   const [error, setError] = useState<string>('');
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (bypassCache = false) => {
     if (!isSupabaseConfigured) {
       setData(defaultData);
       return;
     }
+    if (!bypassCache && cachedData) {
+      setData(cachedData);
+    }
     try {
-      setData(await fetchRemote());
+      const fresh = await (bypassCache ? fetchRemote() : fetchRemoteDeduplicated());
+      setData(fresh);
     } catch (e) {
-      // Fallback keeps the site presentable before the Supabase schema is installed.
-      setData(defaultData);
+      setData((prev) => prev ?? defaultData);
       setError(e instanceof Error ? e.message : String(e));
     }
   }, []);
@@ -73,21 +99,36 @@ export function usePortfolio() {
     load();
   }, [load]);
 
+  // Refresh when user returns to portfolio tab
+  useEffect(() => {
+    const handleFocus = () => {
+      cachedData = null;
+      void load(true);
+    };
+    window.addEventListener('focus', handleFocus);
+    return () => window.removeEventListener('focus', handleFocus);
+  }, [load]);
+
   useEffect(() => {
     if (!supabase) return;
     const client = supabase;
+    const handleRealtimeChange = () => {
+      cachedData = null;
+      void load(true);
+    };
+
     const channel = client
       .channel('portfolio-content')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'profile' }, () => { void load(); })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'experiences' }, () => { void load(); })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'projects' }, () => { void load(); })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'skill_groups' }, () => { void load(); })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'education' }, () => { void load(); })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'project_categories' }, () => { void load(); })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'technologies' }, () => { void load(); })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'certificates' }, () => { void load(); })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'testimonials' }, () => { void load(); })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'site_settings' }, () => { void load(); })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'profile' }, handleRealtimeChange)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'experiences' }, handleRealtimeChange)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'projects' }, handleRealtimeChange)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'skill_groups' }, handleRealtimeChange)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'education' }, handleRealtimeChange)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'project_categories' }, handleRealtimeChange)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'technologies' }, handleRealtimeChange)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'certificates' }, handleRealtimeChange)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'testimonials' }, handleRealtimeChange)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'site_settings' }, handleRealtimeChange)
       .subscribe();
 
     return () => {

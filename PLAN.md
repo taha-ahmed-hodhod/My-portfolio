@@ -346,3 +346,4 @@ The implementation order may be adjusted after the audit reveals dependencies in
 - [x] Real monthly telemetry growth chart built with `Chart.js` canvas and Supabase timestamps.
 - [x] Decoupled Admin i18n dictionary (`src/adminI18n.ts`) with runtime Arabic / English switching and RTL/LTR support.
 - [x] Full accessibility with keyboard focus rings, Escape key modal dismiss, and reduced-motion support.
+- [x] Dynamic Curriculum Vitae (CV / Resume) management: Supabase Storage PDF upload via Bento Profile Manager (`CvPicker`), storage bucket configuration, and dynamic binding across all public portfolio "Download CV" buttons with fallback.

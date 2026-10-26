@@ -132,6 +132,10 @@ export const AdminGrowthChart: React.FC<AdminGrowthChartProps> = ({
       options: {
         responsive: true,
         maintainAspectRatio: false,
+        resizeDelay: 150,
+        animation: {
+          duration: 350,
+        },
         plugins: {
           legend: {
             display: false,
@@ -196,9 +200,15 @@ export const AdminGrowthChart: React.FC<AdminGrowthChartProps> = ({
       },
     };
 
-    chartInstanceRef.current = new Chart(ctx, config);
+    let animFrame = 0;
+    animFrame = requestAnimationFrame(() => {
+      if (canvasRef.current) {
+        chartInstanceRef.current = new Chart(ctx, config);
+      }
+    });
 
     return () => {
+      cancelAnimationFrame(animFrame);
       if (chartInstanceRef.current) {
         chartInstanceRef.current.destroy();
         chartInstanceRef.current = null;
@@ -210,9 +220,9 @@ export const AdminGrowthChart: React.FC<AdminGrowthChartProps> = ({
     <div className="admin-bento-chart-card">
       <div className="chart-card-header">
         <div>
-          <h3 className="chart-card-title">
+          <h2 className="chart-card-title">
             {locale === 'ar' ? 'نشاط المحتوى الموثق' : 'Portfolio Content Activity'}
-          </h3>
+          </h2>
           <span className="chart-card-sub">
             {locale === 'ar'
               ? `${totalInPeriod} عنصر مسجل في قاعدة البيانات خلال آخر 6 أشهر`

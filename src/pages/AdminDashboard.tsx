@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { supabase, isSupabaseConfigured, STORAGE_BUCKET, isAdminEmail } from '../lib/supabase';
 import { defaultData } from '../default-content';
 import { curatedIcon, isSameTechnology, savedTechnologyIconUrl, technologySlug } from '../lib/technology-icons';
+import { invalidatePortfolioCache } from '../lib/data';
 import { TechnologyIconPicker } from '../components/TechnologyIconPicker';
 import type { Profile, Experience, Project, SkillGroup, Education, ProjectCategoryOption, Technology, Certificate, Testimonial, Locale } from '../types';
 import { AdminSidebar, type AdminTab } from '../components/admin/AdminSidebar';
@@ -13,7 +14,7 @@ import { AdminTestimonialsManager } from '../components/admin/AdminTestimonialsM
 import { AdminSiteSettingsManager } from '../components/admin/AdminSiteSettingsManager';
 import { AdminDashboardSkeleton } from '../components/admin/AdminDashboardSkeleton';
 import { adminI18n } from '../adminI18n';
-import { Plus, Pencil, Trash2, Save, X, SearchX, Check, Upload, Tag } from 'lucide-react';
+import { Plus, Pencil, Trash2, Save, X, SearchX, Check, Upload, Tag, FileText, ExternalLink } from 'lucide-react';
 
 type Tab = AdminTab;
 
@@ -252,6 +253,183 @@ function ImagePicker({
               >
                 Remove
               </button>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ---------- uploadCvPdf & CvPicker: Supabase PDF Storage Manager ---------- */
+
+async function uploadCvPdf(
+  file: File,
+  onProgress?: (status: string) => void,
+  previousUrl?: string
+): Promise<string> {
+  if (!supabase) throw new Error('Supabase client is not configured.');
+  const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
+  if (!isPdf) throw new Error('Unsupported format. Please upload a PDF document (.pdf).');
+  if (file.size > 20 * 1024 * 1024) throw new Error('File exceeds 20 MB maximum limit.');
+
+  onProgress?.('Uploading PDF to Supabase Storage…');
+
+  const cleanName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+  const newFileName = `cv_${Date.now()}_${cleanName}`;
+  const path = `cv/${newFileName}`;
+
+  const { error: uploadError } = await supabase.storage.from(STORAGE_BUCKET).upload(path, file, {
+    upsert: true,
+    contentType: 'application/pdf',
+    cacheControl: '3600',
+  });
+  if (uploadError) throw uploadError;
+
+  // Automatically delete the old CV file(s) from Supabase Storage so no orphaned files remain
+  try {
+    const filesToDelete: string[] = [];
+    if (previousUrl) {
+      const cleanPrev = previousUrl.split('?')[0];
+      const marker = `/storage/v1/object/public/${STORAGE_BUCKET}/`;
+      const idx = cleanPrev.indexOf(marker);
+      if (idx !== -1) {
+        const oldPath = decodeURIComponent(cleanPrev.substring(idx + marker.length));
+        if (oldPath.startsWith('cv/') && oldPath !== path) {
+          filesToDelete.push(oldPath);
+        }
+      }
+    }
+
+    // Also scan cv/ folder and clean up any other older CVs
+    const { data: list } = await supabase.storage.from(STORAGE_BUCKET).list('cv');
+    if (list && list.length > 0) {
+      list.forEach((item) => {
+        const itemPath = `cv/${item.name}`;
+        if (item.name !== newFileName && !filesToDelete.includes(itemPath)) {
+          filesToDelete.push(itemPath);
+        }
+      });
+    }
+
+    if (filesToDelete.length > 0) {
+      await supabase.storage.from(STORAGE_BUCKET).remove(filesToDelete);
+    }
+  } catch {
+    // Non-blocking cleanup
+  }
+
+  return supabase.storage.from(STORAGE_BUCKET).getPublicUrl(path).data.publicUrl;
+}
+
+function CvPicker({
+  value,
+  onChange,
+  onSaveCv,
+  locale = 'en',
+}: {
+  value: string;
+  onChange: (url: string) => void;
+  onSaveCv?: (url: string) => Promise<void>;
+  locale?: Locale;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [statusText, setStatusText] = useState('');
+  const [uploadError, setUploadError] = useState('');
+
+  const isCustomCv = Boolean(value && value.trim());
+  const displayName = isCustomCv
+    ? decodeURIComponent(value.split('/').pop()?.split('?')[0] || 'Custom_CV.pdf')
+    : 'Taha_Ahmed_Hodhod_CV.pdf';
+
+  return (
+    <div className={`cv-picker-card ${isCustomCv ? 'is-custom' : 'is-default'}`}>
+      <div className="cv-picker-body">
+        <div className="cv-picker-icon-block">
+          <FileText size={28} className="cv-icon" />
+          <span className="cv-type-pill">PDF</span>
+        </div>
+
+        <div className="cv-picker-details">
+          <div className="cv-status-row">
+            <span className={`cv-status-badge ${isCustomCv ? 'badge-supabase' : 'badge-default'}`}>
+              <span className="cv-status-dot" />
+              {isCustomCv
+                ? (locale === 'ar' ? 'ملف سحابي نشط على Supabase' : 'Active Supabase Asset')
+                : (locale === 'ar' ? 'الملف الافتراضي المحلي' : 'Default Local File')}
+            </span>
+            <span className="cv-filename" title={displayName}>
+              {displayName}
+            </span>
+          </div>
+
+          <p className="cv-hint-text">
+            {locale === 'ar'
+              ? 'عند رفع ملف PDF جديد يتم حفظه على Supabase وحذف الملف القديم تلقائياً وتحديث زر التحميل في الموقع مباشرة.'
+              : 'Uploading a new PDF automatically replaces and deletes the old file on Supabase and updates the portfolio download button in real-time.'}
+          </p>
+
+          {busy && (
+            <div className="cv-upload-progress">
+              <span className="spinner" />
+              <span>{statusText || (locale === 'ar' ? 'جاري الرفع والمعالجة…' : 'Uploading…')}</span>
+            </div>
+          )}
+
+          {uploadError && (
+            <div className="cv-upload-error" role="alert">
+              {uploadError}
+            </div>
+          )}
+
+          <div className="cv-actions-cluster">
+            <label className="cv-upload-btn">
+              <Upload size={14} />
+              <span>
+                {busy
+                  ? (locale === 'ar' ? 'جاري الرفع والاستبدال…' : 'Uploading & replacing…')
+                  : isCustomCv
+                  ? (locale === 'ar' ? 'استبدال ملف الـ CV (PDF)' : 'Replace CV File (PDF)')
+                  : (locale === 'ar' ? 'رفع السيرة الذاتية (PDF)' : 'Upload New CV (PDF)')}
+              </span>
+              <input
+                type="file"
+                accept="application/pdf,.pdf"
+                hidden
+                disabled={busy}
+                onChange={async (e) => {
+                  const f = e.target.files?.[0];
+                  if (!f) return;
+                  setBusy(true);
+                  setUploadError('');
+                  try {
+                    const newUrl = await uploadCvPdf(f, setStatusText, value);
+                    if (onSaveCv) {
+                      setStatusText(locale === 'ar' ? 'جاري حفظ الرابط في الموقع…' : 'Saving to database…');
+                      await onSaveCv(newUrl);
+                    }
+                    onChange(newUrl);
+                  } catch (err) {
+                    setUploadError(err instanceof Error ? err.message : String(err));
+                  } finally {
+                    setBusy(false);
+                    setStatusText('');
+                    e.target.value = '';
+                  }
+                }}
+              />
+            </label>
+
+            {isCustomCv && (
+              <a
+                href={value}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="cv-action-link"
+              >
+                <ExternalLink size={14} />
+                <span>{locale === 'ar' ? 'معاينة الملف' : 'Preview Document'}</span>
+              </a>
             )}
           </div>
         </div>
@@ -536,72 +714,79 @@ export function AdminDashboard() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [confirmDialog]);
 
+  const isLoadingRef = useRef(false);
+
   const load = useCallback(async () => {
-    if (!supabase) return;
+    if (!supabase || isLoadingRef.current) return;
+    isLoadingRef.current = true;
     setLoadError('');
-    const client = supabase;
-    const [pr, ex, pj, sk, ed, ca, te, ce, tm, st] = await Promise.all([
-      client.from('profile').select('*').eq('id', 1).maybeSingle(),
-      client.from('experiences').select('*').order('sort_order'),
-      client.from('projects').select('*').order('sort_order'),
-      client.from('skill_groups').select('*').order('sort_order'),
-      client.from('education').select('*').order('sort_order'),
-      client.from('project_categories').select('*').order('sort_order'),
-      client.from('technologies').select('*').order('sort_order'),
-      client.from('certificates').select('*').order('sort_order'),
-      client.from('testimonials').select('*').order('created_at', { ascending: false }),
-      client.from('site_settings').select('key,value'),
-    ]);
+    try {
+      const client = supabase;
+      const [pr, ex, pj, sk, ed, ca, te, ce, tm, st] = await Promise.all([
+        client.from('profile').select('*').eq('id', 1).maybeSingle(),
+        client.from('experiences').select('*').order('sort_order'),
+        client.from('projects').select('*').order('sort_order'),
+        client.from('skill_groups').select('*').order('sort_order'),
+        client.from('education').select('*').order('sort_order'),
+        client.from('project_categories').select('*').order('sort_order'),
+        client.from('technologies').select('*').order('sort_order'),
+        client.from('certificates').select('*').order('sort_order'),
+        client.from('testimonials').select('*').order('created_at', { ascending: false }),
+        client.from('site_settings').select('key,value'),
+      ]);
 
-    const error = pr.error || ex.error || pj.error || sk.error || ed.error || ca.error || te.error || ce.error || tm.error;
-    if (error) {
-      setLoadError(error.message);
-      return;
+      const error = pr.error || ex.error || pj.error || sk.error || ed.error || ca.error || te.error || ce.error || tm.error;
+      if (error) {
+        setLoadError(error.message);
+        return;
+      }
+      if (pr.data) setProfile({ ...defaultData.profile, ...pr.data });
+      setExperiences(ex.data ?? []);
+      setProjects(pj.data ?? []);
+      setSkills(sk.data ?? []);
+      setEducation(ed.data ?? []);
+      setCategories(ca.data ?? []);
+      setCertificates((ce.data ?? []).map((certificate) => ({ ...certificate, issue_date: certificate.issue_date ?? '' })));
+      setTestimonials(tm.data ?? []);
+
+      // Auto-detect any technologies in skills that are not yet in the technologies table
+      const existingTech = te.data ?? [];
+      const skillNames = skillTechnologyNames(sk.data ?? []);
+      const existingSlugs = new Set(existingTech.map((t) => t.slug));
+      const existingNames = new Set(existingTech.map((t) => t.name.toLowerCase().trim()));
+      const missing = skillNames.filter((name) => {
+        const slug = technologySlug(name);
+        return !existingSlugs.has(slug) && !existingNames.has(name.toLowerCase().trim());
+      });
+
+      if (missing.length > 0) {
+        const toInsert = missing.map((name, i) => ({
+          slug: technologySlug(name),
+          name,
+          icon: curatedIcon(name) || '',
+          sort_order: existingTech.length + i + 1,
+        }));
+        const { data: inserted } = await client.from('technologies').insert(toInsert).select('*');
+        setTechnologies([...existingTech, ...(inserted ?? [])]);
+      } else {
+        setTechnologies(existingTech);
+      }
+
+      const parsed: Record<string, boolean> = {
+        testimonials_button_visible: true,
+        section_work_visible: true,
+        section_about_visible: true,
+        section_experience_visible: true,
+        section_certificates_visible: true,
+        section_testimonials_visible: true,
+      };
+      st.data?.forEach((row) => {
+        parsed[row.key] = row.value === 'true';
+      });
+      setSiteSettings(parsed);
+    } finally {
+      isLoadingRef.current = false;
     }
-    if (pr.data) setProfile({ ...defaultData.profile, ...pr.data });
-    setExperiences(ex.data ?? []);
-    setProjects(pj.data ?? []);
-    setSkills(sk.data ?? []);
-    setEducation(ed.data ?? []);
-    setCategories(ca.data ?? []);
-    setCertificates((ce.data ?? []).map((certificate) => ({ ...certificate, issue_date: certificate.issue_date ?? '' })));
-    setTestimonials(tm.data ?? []);
-
-    // Auto-detect any technologies in skills that are not yet in the technologies table
-    const existingTech = te.data ?? [];
-    const skillNames = skillTechnologyNames(sk.data ?? []);
-    const existingSlugs = new Set(existingTech.map((t) => t.slug));
-    const existingNames = new Set(existingTech.map((t) => t.name.toLowerCase().trim()));
-    const missing = skillNames.filter((name) => {
-      const slug = technologySlug(name);
-      return !existingSlugs.has(slug) && !existingNames.has(name.toLowerCase().trim());
-    });
-
-    if (missing.length > 0) {
-      const toInsert = missing.map((name, i) => ({
-        slug: technologySlug(name),
-        name,
-        icon: curatedIcon(name) || '',
-        sort_order: existingTech.length + i + 1,
-      }));
-      const { data: inserted } = await client.from('technologies').insert(toInsert).select('*');
-      setTechnologies([...existingTech, ...(inserted ?? [])]);
-    } else {
-      setTechnologies(existingTech);
-    }
-
-    const parsed: Record<string, boolean> = {
-      testimonials_button_visible: true,
-      section_work_visible: true,
-      section_about_visible: true,
-      section_experience_visible: true,
-      section_certificates_visible: true,
-      section_testimonials_visible: true,
-    };
-    st.data?.forEach((row) => {
-      parsed[row.key] = row.value === 'true';
-    });
-    setSiteSettings(parsed);
   }, []);
 
   useEffect(() => {
@@ -627,6 +812,7 @@ export function AdminDashboard() {
     if (error) {
       showToast(error.message, 'error');
     } else {
+      invalidatePortfolioCache();
       showToast('Profile saved successfully ✓', 'success');
     }
   }
@@ -949,6 +1135,30 @@ export function AdminDashboard() {
                   onChange={onChange}
                   hidePreview={true}
                   buttonLabel={adminLocale === 'ar' ? 'تغيير الصورة الشخصية' : 'Change Profile Photo'}
+                />
+              )}
+              renderCvPicker={(value, onChange) => (
+                <CvPicker
+                  value={value}
+                  onChange={onChange}
+                  onSaveCv={async (url) => {
+                    if (!supabase) return;
+                    setProfile((p) => ({ ...p, cv_url: url }));
+                    const { error } = await supabase.from('profile').upsert({
+                      ...profile,
+                      cv_url: url || null,
+                      id: 1,
+                    });
+                    if (error) throw error;
+                    invalidatePortfolioCache();
+                    showToast(
+                      url
+                        ? (adminLocale === 'ar' ? 'تم رفع ملف السيرة الذاتية وحفظه في الموقع بنجاح ✓' : 'CV uploaded & saved to portfolio ✓')
+                        : (adminLocale === 'ar' ? 'تمت استعادة ملف السيرة الذاتية الافتراضي بنجاح ✓' : 'Reset to default CV successfully ✓'),
+                      'success'
+                    );
+                  }}
+                  locale={adminLocale}
                 />
               )}
             />
@@ -1438,6 +1648,7 @@ function CollectionEditor<T extends { id?: number; sort_order: number }>(props: 
                   className="row-action-btn"
                   onClick={() => startEdit(row)}
                   aria-label={t.edit}
+                  title={t.edit}
                 >
                   <Pencil size={14} />
                   <span>{t.edit}</span>
@@ -1448,6 +1659,7 @@ function CollectionEditor<T extends { id?: number; sort_order: number }>(props: 
                     className="row-action-btn btn-danger"
                     onClick={() => props.onRequestDelete(row)}
                     aria-label={t.delete}
+                    title={t.delete}
                   >
                     <Trash2 size={14} />
                     <span>{t.delete}</span>

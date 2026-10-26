@@ -6,13 +6,27 @@
       name="viewport"
       content="width=device-width, initial-scale=1.0, viewport-fit=cover"
     />
-    <link rel="shortcut icon" href="./public/icon.svg" type="image/x-icon">
+    <link rel="shortcut icon" href="/icon.svg" type="image/svg+xml" />
+    <!-- Preconnect to Supabase REST and Auth endpoints -->
+    <link rel="preconnect" href="https://bjupdirqjbhkrjezvqed.supabase.co" crossorigin />
+    <link rel="dns-prefetch" href="https://bjupdirqjbhkrjezvqed.supabase.co" />
+
+    <!-- Google Fonts preconnect and non-blocking stylesheet -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
+      rel="preload"
       href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap"
-      rel="stylesheet"
+      as="style"
+      onload="this.onload=null;this.rel='stylesheet'"
     />
+    <noscript>
+      <link
+        rel="stylesheet"
+        href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap"
+      />
+    </noscript>
+
     <title>Taha Hodhod Portfolio</title>
     <meta
       name="description"

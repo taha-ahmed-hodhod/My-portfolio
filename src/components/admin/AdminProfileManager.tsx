@@ -13,6 +13,7 @@ import {
   Check,
   Upload,
   Globe,
+  FileText,
 } from 'lucide-react';
 import type { Locale, Profile } from '../../types';
 import { adminI18n } from '../../adminI18n';
@@ -24,6 +25,7 @@ interface AdminProfileManagerProps {
   onSave: () => Promise<void> | void;
   onChangeField: (key: keyof Profile) => (value: string) => void;
   renderImagePicker: (value: string, folder: string, onChange: (url: string) => void) => React.ReactNode;
+  renderCvPicker?: (value: string, onChange: (url: string) => void) => React.ReactNode;
 }
 
 export const AdminProfileManager: React.FC<AdminProfileManagerProps> = ({
@@ -33,6 +35,7 @@ export const AdminProfileManager: React.FC<AdminProfileManagerProps> = ({
   onSave,
   onChangeField,
   renderImagePicker,
+  renderCvPicker,
 }) => {
   const [langTab, setLangTab] = useState<'both' | 'en' | 'ar'>('both');
   const [isDirty, setIsDirty] = useState(false);
@@ -236,6 +239,24 @@ export const AdminProfileManager: React.FC<AdminProfileManagerProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Cluster: Curriculum Vitae (CV) & Resume Document */}
+      {renderCvPicker && (
+        <div className="profile-bento-card cv-cluster-card">
+          <div className="card-cluster-title-line">
+            <FileText size={16} className="cluster-icon-accent" />
+            <h4>{locale === 'ar' ? 'ملف السيرة الذاتية (CV / Resume)' : 'Curriculum Vitae (CV / Resume)'}</h4>
+          </div>
+          <p className="cv-cluster-desc">
+            {locale === 'ar'
+              ? 'ارفع ملف الـ CV بصيغة PDF ليتم حفظه على Supabase وربطه تلقائياً بزر التحميل في واجهة البورتفوليو.'
+              : 'Upload your CV in PDF format to host it on Supabase Storage and link it dynamically to all download buttons across the portfolio.'}
+          </p>
+          <div className="cv-picker-slot">
+            {renderCvPicker(profile.cv_url || '', handleChange('cv_url'))}
+          </div>
+        </div>
+      )}
 
       {/* Cluster 2: Narrative & Copywriting Storytelling */}
       <div className="profile-bento-card narrative-cluster-card">

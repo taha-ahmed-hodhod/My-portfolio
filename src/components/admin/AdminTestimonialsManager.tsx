@@ -259,6 +259,8 @@ export const AdminTestimonialsManager: React.FC<AdminTestimonialsManagerProps> =
                       type="button"
                       className="hero-primary-btn btn-sm btn-approve-emerald"
                       onClick={() => onSetStatus(item.id!, 'approved')}
+                      title={t.approve}
+                      aria-label={t.approve}
                     >
                       <Check size={14} />
                       <span>{t.approve}</span>
@@ -270,6 +272,8 @@ export const AdminTestimonialsManager: React.FC<AdminTestimonialsManagerProps> =
                       type="button"
                       className="hero-secondary-btn btn-sm btn-reject-subtle"
                       onClick={() => onSetStatus(item.id!, 'rejected')}
+                      title={t.reject}
+                      aria-label={t.reject}
                     >
                       <X size={14} />
                       <span>{t.reject}</span>
@@ -281,6 +285,8 @@ export const AdminTestimonialsManager: React.FC<AdminTestimonialsManagerProps> =
                       type="button"
                       className="hero-secondary-btn btn-sm"
                       onClick={() => onSetStatus(item.id!, 'pending')}
+                      title={locale === 'ar' ? 'إعادة للمراجعة' : 'Reset to Pending'}
+                      aria-label={locale === 'ar' ? 'إعادة للمراجعة' : 'Reset to Pending'}
                     >
                       <Clock size={13} />
                       <span>{locale === 'ar' ? 'إعادة للمراجعة' : 'Reset to Pending'}</span>
@@ -292,6 +298,7 @@ export const AdminTestimonialsManager: React.FC<AdminTestimonialsManagerProps> =
                   type="button"
                   className="row-action-btn btn-danger btn-sm"
                   onClick={() => onRequestDelete(item)}
+                  title={t.delete}
                   aria-label={`Delete testimonial from ${item.client_name}`}
                 >
                   <Trash2 size={14} />

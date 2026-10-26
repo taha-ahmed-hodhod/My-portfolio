@@ -180,7 +180,7 @@ export const AdminOverviewBento: React.FC<AdminOverviewBentoProps> = ({
       <section className="bento-card bento-recent-card">
         <div className="recent-card-head">
           <div>
-            <h3 className="recent-card-title">{t.recentProjectsTitle}</h3>
+            <h2 className="recent-card-title">{t.recentProjectsTitle}</h2>
             <span className="recent-card-sub">{t.recentProjectsSub}</span>
           </div>
           <button

@@ -190,7 +190,11 @@ export function Portfolio({ data, locale, setLocale }: { data: PortfolioData; lo
   const isTestimonialHoveredRef = useRef(false);
   const testimonialOffsetRef = useRef(0);
 
-  const cvPdfUrl = `${import.meta.env.BASE_URL}Taha_Ahmed_Hodhod_CV.pdf`;
+  const rawCvUrl = p.cv_url?.trim();
+  const cvViewUrl = rawCvUrl || `${import.meta.env.BASE_URL}Taha_Ahmed_Hodhod_CV.pdf`;
+  const cvPdfUrl = rawCvUrl
+    ? (rawCvUrl.includes('?') ? rawCvUrl : `${rawCvUrl}?download=Taha_Ahmed_Hodhod_CV.pdf`)
+    : `${import.meta.env.BASE_URL}Taha_Ahmed_Hodhod_CV.pdf`;
 
   const L = (en: string, ar: string) => (locale === 'ar' ? ar : en);
   const name = L(p.name_en, p.name_ar);
@@ -422,7 +426,7 @@ export function Portfolio({ data, locale, setLocale }: { data: PortfolioData; lo
               <p className="hero-description">{L(p.intro_en, p.intro_ar)}</p>
               <div className="hero-actions">
                 <a className="primary-action" href="#work">{t.viewWork}<Arrow /></a>
-                <a className="text-action" href={cvPdfUrl} download="Taha_Ahmed_Hodhod_CV.pdf" onClick={() => setNotice(t.downloaded)}>{t.download}<span aria-hidden="true">↓</span></a>
+                <a className="text-action" href={cvPdfUrl} download="Taha_Ahmed_Hodhod_CV.pdf" target="_blank" rel="noopener noreferrer" onClick={() => setNotice(t.downloaded)}>{t.download}<span aria-hidden="true">↓</span></a>
               </div>
               {data.source === 'local' && <p className="fiction-notice"><span aria-hidden="true">◌</span> {t.localNotice}</p>}
             </div>
@@ -822,8 +826,8 @@ export function Portfolio({ data, locale, setLocale }: { data: PortfolioData; lo
                   {p.linkedin && <a href={p.linkedin} target="_blank" rel="noreferrer">LinkedIn ↗</a>}
                 </div>
                 <div className="resume-actions">
-                  <a href={cvPdfUrl} download="Taha_Ahmed_Hodhod_CV.pdf" onClick={() => setNotice(t.downloaded)}>{t.download} ↓</a>
-                  <a href={cvPdfUrl} target="_blank" rel="noreferrer">{t.print} ↗</a>
+                  <a href={cvPdfUrl} download="Taha_Ahmed_Hodhod_CV.pdf" target="_blank" rel="noopener noreferrer" onClick={() => setNotice(t.downloaded)}>{t.download} ↓</a>
+                  <a href={cvViewUrl} target="_blank" rel="noopener noreferrer">{t.print} ↗</a>
                 </div>
               </div>
             </div>

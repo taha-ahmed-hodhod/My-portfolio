@@ -311,4 +311,46 @@ All database modifications are version-controlled in `supabase/migrations/`:
 - **Admin Dashboard Skeleton (`AdminDashboardSkeleton.tsx`)**:
   - Replaces text loader during admin workspace authentication and initial fetch, rendering a full skeleton replica of the sidebar, top search bar, telemetry stat cards, and activity chart.
 
+### 17.9 Lighthouse & Core Web Vitals Optimization System
+- **Route-Based Code Splitting (`React.lazy` & `Suspense`)**:
+  - Decoupled heavy administrative dependencies (`chart.js`, admin managers) from public visitors.
+  - Configured `vite.config.ts` manual chunks (`vendor-react`, `vendor-charts`, `vendor-supabase`, `vendor-icons`), shrinking initial portfolio bundle to just 13.3 kB gzip.
+- **Promise Deduplication & Memory Cache (`src/lib/data.ts` & `AdminDashboard.tsx`)**:
+  - Added `inFlightPromise` deduplication across all 10 Supabase tables, preventing duplicate parallel network waterfalls.
+  - Cached state enables 0ms immediate renders on subsequent route mounts.
+- **Forced Reflow Elimination (`AdminGrowthChart.tsx`)**:
+  - Added `resizeDelay: 150` and wrapped `Chart.js` initialization in `requestAnimationFrame` to decouple canvas geometry measurement from style calculation.
+- **Preconnect & Non-Blocking Font Loading (`index.html`)**:
+  - Preconnected to Supabase origin (`https://bjupdirqjbhkrjezvqed.supabase.co`).
+  - Preloaded Cairo font with asynchronous `onload` swap to eliminate render-blocking CSS delays.
+- **Accessibility & SEO Compliance**:
+  - Fixed `robots.txt` with dedicated `public/robots.txt` (resolving 27 Lighthouse parser errors).
+  - Fixed heading structure hierarchy (`h1` -> `h2`).
+  - Elevated `.admin-cluster-label` contrast to `#94a3b8` (> 5.5:1 ratio) meeting WCAG AA.
+
+### 17.10 Dynamic Curriculum Vitae (CV) & Resume Management
+- **Supabase Storage Configuration (`supabase/migrations/20261026033000_add_cv_url_and_pdf_upload.sql`)**:
+  - Added `cv_url` column to `public.profile` table.
+  - Configured `portfolio` storage bucket permissions to permit `application/pdf` MIME types with a 20MB file size ceiling.
+- **Bento CV Manager & Interactive Picker (`CvPicker` in `AdminDashboard.tsx` & `AdminProfileManager.tsx`)**:
+  - Interactive PDF document card with active status pill indicator (`Active Supabase Asset` vs `Default Local File`).
+  - Single-click PDF upload with progress feedback and automatic file sanitization.
+  - Automatic cleanup: Uploading a new CV automatically purges and deletes the previous CV file(s) from Supabase Storage (`portfolio/cv/*`) to prevent storage clutter.
+  - Document actions: Streamlined to "Upload / Replace CV" and direct in-browser "Preview Document ↗" (`ExternalLink`).
+  - Bilingual copywriting (Arabic and English) with zero native browser alerts.
+- **Dynamic Portfolio Binding (`src/pages/Portfolio.tsx`)**:
+  - Binds the Hero "Download CV" action button, footer resume link, and print view to the dynamic Supabase CV URL (`profile.cv_url`) with `?download=Taha_Ahmed_Hodhod_CV.pdf` parameter.
+  - Gracefully falls back to the local `public/Taha_Ahmed_Hodhod_CV.pdf` if no custom CV has been uploaded.
+
+### 17.11 Mobile Responsive Dashboard Optimization
+- **Side Padding Optimization**:
+  - Eliminated legacy conflicting `.admin-main-stage` padding (`72px 18px 40px`).
+  - Optimized `.admin-bento-frame` side padding to `8px`–`10px` on mobile (<768px) and `4px` on small devices (<480px).
+  - Streamlined inner card padding (`.profile-bento-card`, `.admin-panel`, `.bento-hero-card`, `.cv-picker-card`) to `12px`–`14px`, maximizing usable content area.
+- **Action Buttons & Topbar Icon Mode on Mobile**:
+  - Automatically hidden text labels next to action icons across all collections: Edit (`Pencil`), Delete (`Trash2`), Language switch (`Languages`), and Live Portfolio (`ExternalLink`).
+  - Buttons adapt to square touch targets (`34px`–`38px`) with centered icons, accessible `title` and `aria-label` attributes.
+  - Testimonial moderation buttons (Approve, Reject, Delete) adapt into sleek icon controls.
+  - Search bar expands flexibly to fill available width on one single non-overflowing row.
+
 

@@ -30,6 +30,7 @@ export interface Profile {
   github: string; linkedin: string;
   photo_url: string;
   years_label: string;
+  cv_url?: string;
 }
 
 export interface Experience {

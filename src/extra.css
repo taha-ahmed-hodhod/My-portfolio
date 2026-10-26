@@ -1975,7 +1975,7 @@
   font-size: 10.5px;
   text-transform: uppercase;
   letter-spacing: 0.1em;
-  color: rgba(241, 245, 249, 0.45);
+  color: #94a3b8;
   padding: 4px 10px 6px;
   font-weight: 600;
 }
@@ -2414,15 +2414,48 @@
   }
 }
 
-@media (max-width: 640px) {
+@media (max-width: 768px) {
+  .admin-bento-topbar {
+    gap: 8px;
+    padding: 6px 0 14px;
+    margin-bottom: 16px;
+  }
   .admin-topbar-search-box {
-    max-width: 180px;
+    max-width: none;
+    flex: 1;
+    height: 38px;
+    padding: 0 10px;
+    border-radius: 10px;
+  }
+  .admin-search-input {
+    font-size: 13px;
   }
   .search-kbd-hint {
-    display: none;
+    display: none !important;
   }
-  .live-link-label {
-    display: none;
+  .admin-topbar-actions {
+    gap: 6px;
+    flex-shrink: 0;
+  }
+  .admin-topbar-btn {
+    width: 38px;
+    height: 38px;
+    min-width: 38px;
+    padding: 0 !important;
+    justify-content: center;
+    border-radius: 10px;
+  }
+  .admin-topbar-btn .lang-label,
+  .admin-topbar-btn .live-link-label {
+    display: none !important;
+  }
+  .admin-topbar-menu-btn {
+    width: 38px;
+    height: 38px;
+    min-width: 38px;
+    min-height: 38px;
+    padding: 0;
+    border-radius: 10px;
   }
 }
 
@@ -4321,22 +4354,157 @@
 }
 
 @media (max-width: 900px) {
-  .admin-mobile-bar {
-    display: flex;
-  }
-  .admin-sidebar {
-    position: fixed;
-    top: 56px;
-    bottom: 0;
-    left: 0;
-    transform: translateX(-100%);
-    transition: transform 0.3s ease;
-  }
-  .admin-sidebar.is-open {
-    transform: translateX(0);
-  }
   .admin-main-stage {
-    padding: 72px 18px 40px;
+    padding: 0 0 40px !important;
+  }
+}
+
+@media (max-width: 768px) {
+  /* Reduce side padding across dashboard containers */
+  .admin-bento-frame {
+    padding: 10px 8px 32px !important;
+  }
+
+  .admin-main-stage {
+    padding: 0 0 36px !important;
+  }
+
+  .admin-stage-header {
+    margin-bottom: 16px !important;
+    padding-bottom: 12px !important;
+  }
+
+  .admin-stage-title {
+    font-size: 20px !important;
+  }
+
+  .admin-stage-sub {
+    font-size: 11.5px !important;
+  }
+
+  /* Bento cards & panels side padding reduction */
+  .profile-bento-card,
+  .bento-hero-card,
+  .admin-panel,
+  .cv-picker-card,
+  .af.image-picker-card,
+  .testimonials-manager-bento,
+  .site-settings-bento {
+    padding: 14px 10px !important;
+    border-radius: 14px !important;
+  }
+
+  .card-cluster-title-line {
+    margin-bottom: 14px !important;
+    padding-bottom: 10px !important;
+  }
+
+  /* Collection rows & action buttons: hide Edit and Delete text labels */
+  .admin-bento-row {
+    padding: 9px 8px !important;
+    gap: 8px !important;
+  }
+
+  .row-main-meta {
+    gap: 10px !important;
+  }
+
+  .row-icon-bubble {
+    width: 32px !important;
+    height: 32px !important;
+    border-radius: 8px !important;
+    font-size: 11px !important;
+  }
+
+  .row-primary-label {
+    font-size: 13px !important;
+  }
+
+  .row-sub-label {
+    font-size: 11px !important;
+  }
+
+  .row-actions-cluster {
+    gap: 6px !important;
+  }
+
+  .row-action-btn {
+    padding: 0 !important;
+    width: 34px !important;
+    height: 34px !important;
+    min-height: 34px !important;
+    justify-content: center !important;
+    border-radius: 8px !important;
+    flex-shrink: 0 !important;
+  }
+
+  .row-action-btn span {
+    display: none !important;
+  }
+
+  /* Testimonials moderation buttons on mobile */
+  .t-card-actions {
+    gap: 8px !important;
+  }
+
+  .t-primary-actions {
+    gap: 6px !important;
+  }
+
+  .t-card-actions .hero-primary-btn,
+  .t-card-actions .hero-secondary-btn,
+  .t-card-actions .row-action-btn {
+    padding: 0 !important;
+    width: 34px !important;
+    height: 34px !important;
+    min-height: 34px !important;
+    justify-content: center !important;
+    border-radius: 8px !important;
+  }
+
+  .t-card-actions .hero-primary-btn span,
+  .t-card-actions .hero-secondary-btn span,
+  .t-card-actions .row-action-btn span {
+    display: none !important;
+  }
+
+  /* Sticky Save Bar in Profile */
+  .profile-sticky-save-bar {
+    padding: 10px 14px !important;
+    bottom: 12px !important;
+    border-radius: 12px !important;
+  }
+
+  .profile-sticky-save-bar .save-bar-hint {
+    gap: 6px !important;
+  }
+
+  .profile-sticky-save-bar .save-hint-text {
+    display: none !important;
+  }
+
+  .profile-save-btn {
+    padding: 8px 16px !important;
+    font-size: 13px !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .admin-bento-frame {
+    padding: 6px 4px 28px !important;
+  }
+
+  .profile-bento-card,
+  .bento-hero-card,
+  .admin-panel,
+  .cv-picker-card,
+  .af.image-picker-card {
+    padding: 12px 8px !important;
+  }
+
+  .admin-bento-row {
+    padding: 8px 6px !important;
+    gap: 6px !important;
   }
 }
 
@@ -5764,5 +5932,233 @@
     display: none;
   }
 }
+
+/* ========================================================
+   CURRICULUM VITAE (CV / RESUME) BENTO CLUSTER & PICKER
+   ======================================================== */
+.cv-cluster-card {
+  margin-top: 24px;
+}
+
+.cv-cluster-desc {
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--muted, #94a3b8);
+  margin: -10px 0 18px 0;
+}
+
+.cv-picker-card {
+  background: rgba(8, 15, 15, 0.6);
+  border: 1px solid var(--border-subtle);
+  border-radius: 16px;
+  padding: 22px 24px;
+  transition: border-color 0.25s ease, box-shadow 0.25s ease;
+}
+
+.cv-picker-card.is-custom {
+  border-color: rgba(45, 212, 191, 0.32);
+  box-shadow: 0 4px 24px rgba(20, 184, 166, 0.06);
+}
+
+.cv-picker-body {
+  display: flex;
+  gap: 22px;
+  align-items: flex-start;
+}
+
+@media (max-width: 640px) {
+  .cv-picker-body {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
+
+.cv-picker-icon-block {
+  width: 60px;
+  height: 60px;
+  border-radius: 14px;
+  background: rgba(45, 212, 191, 0.08);
+  border: 1px solid rgba(45, 212, 191, 0.22);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.cv-picker-icon-block .cv-icon {
+  color: var(--accent-light, #2dd4bf);
+}
+
+.cv-picker-icon-block .cv-type-pill {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: rgba(45, 212, 191, 0.22);
+  color: #fff;
+  margin-top: 2px;
+}
+
+.cv-picker-details {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.cv-status-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.cv-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: 999px;
+}
+
+.cv-status-badge.badge-supabase {
+  background: rgba(45, 212, 191, 0.12);
+  border: 1px solid rgba(45, 212, 191, 0.3);
+  color: #2dd4bf;
+}
+
+.cv-status-badge.badge-default {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: var(--muted, #94a3b8);
+}
+
+.cv-status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  box-shadow: 0 0 6px currentColor;
+}
+
+.cv-filename {
+  font-size: 13.5px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  color: var(--ink, #fff);
+  font-weight: 600;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cv-hint-text {
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--muted, #94a3b8);
+  margin: 0;
+}
+
+.cv-upload-progress {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  color: var(--accent-light, #2dd4bf);
+  background: rgba(45, 212, 191, 0.08);
+  padding: 6px 12px;
+  border-radius: 8px;
+  width: fit-content;
+}
+
+.cv-upload-error {
+  font-size: 12.5px;
+  color: #f87171;
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.25);
+  padding: 7px 12px;
+  border-radius: 8px;
+  width: fit-content;
+}
+
+.cv-actions-cluster {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 6px;
+}
+
+.cv-upload-btn {
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 9px 18px;
+  border-radius: 10px;
+  background: rgba(45, 212, 191, 0.14);
+  border: 1px solid rgba(45, 212, 191, 0.35);
+  color: #2dd4bf;
+  transition: all 0.2s ease;
+  user-select: none;
+}
+
+.cv-upload-btn:hover {
+  background: rgba(45, 212, 191, 0.24);
+  border-color: #2dd4bf;
+  color: #fff;
+  transform: translateY(-1px);
+}
+
+.cv-action-link {
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  padding: 9px 16px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border-subtle);
+  color: var(--ink, #fff);
+  transition: all 0.2s ease;
+}
+
+.cv-action-link:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.2);
+  color: #fff;
+  transform: translateY(-1px);
+}
+
+.cv-reset-btn {
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: var(--muted, #94a3b8);
+  font-size: 12.5px;
+  font-weight: 500;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: 10px;
+  transition: all 0.2s ease;
+}
+
+.cv-reset-btn:hover {
+  color: #f87171;
+  border-color: rgba(239, 68, 68, 0.3);
+  background: rgba(239, 68, 68, 0.08);
+}
+
 
 
