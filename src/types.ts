@@ -52,6 +52,9 @@ export interface Project {
   tags: string[];
   demo_url: string; code_url: string;
   image_url: string;
+  problem?: string;
+  solution?: string;
+  my_role?: string;
   sort_order: number;
   created_at?: string;
 }

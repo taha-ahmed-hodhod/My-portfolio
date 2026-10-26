@@ -63,7 +63,31 @@ export function App() {
           }
         />
         <Route
+          path="/admin/login"
+          element={
+            <Suspense fallback={<AdminDashboardSkeleton />}>
+              <AdminLogin />
+            </Suspense>
+          }
+        />
+        <Route
           path="/admin/dashboard"
+          element={
+            <Suspense fallback={<AdminDashboardSkeleton />}>
+              <AdminDashboard />
+            </Suspense>
+          }
+        />
+        <Route
+          path="/admin/dashboard/:tab"
+          element={
+            <Suspense fallback={<AdminDashboardSkeleton />}>
+              <AdminDashboard />
+            </Suspense>
+          }
+        />
+        <Route
+          path="/admin/:tab"
           element={
             <Suspense fallback={<AdminDashboardSkeleton />}>
               <AdminDashboard />

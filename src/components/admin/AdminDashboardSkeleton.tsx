@@ -21,7 +21,7 @@ export function AdminDashboardSkeleton({ adminLocale = 'en' }: AdminDashboardSke
       </div>
 
       {/* Sidebar Skeleton */}
-      <aside className="admin-sidebar skeleton-admin-sidebar">
+      <aside className="admin-bento-sidebar skeleton-admin-sidebar">
         <div className="admin-sidebar-header">
           <div className="skeleton-box skeleton-admin-logo skeleton-shimmer" />
           <div className="skeleton-box skeleton-admin-badge skeleton-shimmer" />
@@ -55,8 +55,8 @@ export function AdminDashboardSkeleton({ adminLocale = 'en' }: AdminDashboardSke
         </div>
       </aside>
 
-      {/* Main Content Skeleton */}
-      <main className="admin-main skeleton-admin-main">
+      {/* Main App Stage with Bento Frame & Topbar */}
+      <div className="admin-bento-frame skeleton-bento-frame">
         {/* Topbar Skeleton */}
         <header className="admin-topbar skeleton-admin-topbar">
           <div className="skeleton-admin-topbar-left">
@@ -71,39 +71,41 @@ export function AdminDashboardSkeleton({ adminLocale = 'en' }: AdminDashboardSke
         </header>
 
         {/* Bento Content Area Skeleton */}
-        <div className="admin-content-flow skeleton-admin-content">
-          {/* Greeting Hub Skeleton */}
-          <div className="skeleton-admin-hero-card skeleton-shimmer">
-            <div className="skeleton-box skeleton-title-md skeleton-shimmer" />
-            <div className="skeleton-box skeleton-text-line line-60 skeleton-shimmer" />
-          </div>
+        <main className="admin-main-stage skeleton-admin-main-stage">
+          <div className="admin-stage-body skeleton-admin-stage-body">
+            {/* Greeting Hub Skeleton */}
+            <div className="skeleton-admin-hero-card skeleton-shimmer">
+              <div className="skeleton-box skeleton-title-md skeleton-shimmer" />
+              <div className="skeleton-box skeleton-text-line line-60 skeleton-shimmer" />
+            </div>
 
-          {/* Stat Cards Grid Skeleton */}
-          <div className="skeleton-admin-stats-grid">
-            {[1, 2, 3, 4, 5].map((i) => (
-              <div key={i} className="skeleton-admin-stat-card">
-                <div className="skeleton-admin-stat-top">
-                  <div className="skeleton-box skeleton-stat-icon skeleton-shimmer" />
-                  <div className="skeleton-box skeleton-stat-badge skeleton-shimmer" />
+            {/* Stat Cards Grid Skeleton */}
+            <div className="skeleton-admin-stats-grid">
+              {[1, 2, 3, 4, 5].map((i) => (
+                <div key={i} className="skeleton-admin-stat-card">
+                  <div className="skeleton-admin-stat-top">
+                    <div className="skeleton-box skeleton-stat-icon skeleton-shimmer" />
+                    <div className="skeleton-box skeleton-stat-badge skeleton-shimmer" />
+                  </div>
+                  <div className="skeleton-box skeleton-stat-num skeleton-shimmer" />
+                  <div className="skeleton-box skeleton-stat-label skeleton-shimmer" />
                 </div>
-                <div className="skeleton-box skeleton-stat-num skeleton-shimmer" />
-                <div className="skeleton-box skeleton-stat-label skeleton-shimmer" />
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
 
-          {/* Activity Chart Area Skeleton */}
-          <div className="skeleton-admin-chart-card skeleton-shimmer">
-            <div className="skeleton-chart-header">
-              <div className="skeleton-box skeleton-chart-title skeleton-shimmer" />
-              <div className="skeleton-box skeleton-chart-pills skeleton-shimmer" />
-            </div>
-            <div className="skeleton-chart-mock">
-              <div className="skeleton-chart-wave skeleton-shimmer" />
+            {/* Activity Chart Area Skeleton */}
+            <div className="skeleton-admin-chart-card skeleton-shimmer">
+              <div className="skeleton-chart-header">
+                <div className="skeleton-box skeleton-chart-title skeleton-shimmer" />
+                <div className="skeleton-box skeleton-chart-pills skeleton-shimmer" />
+              </div>
+              <div className="skeleton-chart-mock">
+                <div className="skeleton-chart-wave skeleton-shimmer" />
+              </div>
             </div>
           </div>
-        </div>
-      </main>
+        </main>
+      </div>
     </div>
   );
 }

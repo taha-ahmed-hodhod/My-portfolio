@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { supabase, isSupabaseConfigured, isAdminEmail } from '../lib/supabase';
+import { AdminDashboardSkeleton } from '../components/admin/AdminDashboardSkeleton';
 
 export function AdminLogin() {
   const navigate = useNavigate();
@@ -9,21 +10,34 @@ export function AdminLogin() {
   const [showPassword, setShowPassword] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [checkingSession, setCheckingSession] = useState(true);
 
   useEffect(() => {
-    if (!supabase) return;
+    if (!supabase) {
+      setCheckingSession(false);
+      return;
+    }
     const client = supabase;
     let active = true;
     client.auth.getSession().then(async ({ data }) => {
-      if (!active || !data.session) return;
-      if (isAdminEmail(data.session.user.email)) {
+      if (!active) return;
+      if (data.session && isAdminEmail(data.session.user.email)) {
         navigate('/admin/dashboard', { replace: true });
-      } else {
+        return;
+      }
+      if (data.session) {
         await client.auth.signOut();
       }
+      setCheckingSession(false);
+    }).catch(() => {
+      if (active) setCheckingSession(false);
     });
     return () => { active = false; };
   }, [navigate]);
+
+  if (checkingSession) {
+    return <AdminDashboardSkeleton />;
+  }
 
   async function submit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();

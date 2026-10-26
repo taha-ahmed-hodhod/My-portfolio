@@ -907,6 +907,38 @@ export function Portfolio({ data, locale, setLocale }: { data: PortfolioData; lo
               {/* 3. Description and Summary */}
               <p className="case-context">{L(project.summary_en, project.summary_ar)}</p>
 
+              {/* Case Study Insights: Role, Problem, Solution */}
+              {(project.my_role || project.problem || project.solution) && (
+                <div className="case-study-details">
+                  {project.my_role && (
+                    <div className="case-detail-card role-card">
+                      <div className="case-detail-header">
+                        <span className="case-detail-badge">👤 {locale === 'ar' ? 'دوري في المشروع' : 'My Role'}</span>
+                      </div>
+                      <p className="case-detail-text">{project.my_role}</p>
+                    </div>
+                  )}
+
+                  {project.problem && (
+                    <div className="case-detail-card problem-card">
+                      <div className="case-detail-header">
+                        <span className="case-detail-badge problem-badge">⚡ {locale === 'ar' ? 'المشكلة والتحدي' : 'The Problem & Challenge'}</span>
+                      </div>
+                      <p className="case-detail-text">{project.problem}</p>
+                    </div>
+                  )}
+
+                  {project.solution && (
+                    <div className="case-detail-card solution-card">
+                      <div className="case-detail-header">
+                        <span className="case-detail-badge solution-badge">✨ {locale === 'ar' ? 'ما تم إنجازه والحل' : 'What Was Done & Solution'}</span>
+                      </div>
+                      <p className="case-detail-text">{project.solution}</p>
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* 4. Technologies and Technology Icons */}
               {project.tags.length > 0 && (
                 <div className="dialog-tech-section">

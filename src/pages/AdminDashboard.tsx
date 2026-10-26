@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Link, useNavigate } from 'react-router';
+import { Link, useNavigate, useParams } from 'react-router';
 import { supabase, isSupabaseConfigured, STORAGE_BUCKET, isAdminEmail } from '../lib/supabase';
 import { defaultData } from '../default-content';
 import { curatedIcon, isSameTechnology, savedTechnologyIconUrl, technologySlug } from '../lib/technology-icons';
@@ -17,6 +17,19 @@ import { adminI18n } from '../adminI18n';
 import { Plus, Pencil, Trash2, Save, X, SearchX, Check, Upload, Tag, FileText, ExternalLink } from 'lucide-react';
 
 type Tab = AdminTab;
+
+const VALID_TABS: readonly AdminTab[] = [
+  'overview',
+  'profile',
+  'projects',
+  'categories',
+  'certificates',
+  'testimonials',
+  'experiences',
+  'skills',
+  'education',
+  'settings',
+];
 
 interface ToastMessage {
   id: string;
@@ -182,45 +195,73 @@ function ImagePicker({
 
   return (
     <div className="af image-picker-card">
-      <span className="image-picker-label">Media Asset</span>
-      <div className="image-picker-body">
-        <div className="image-preview-wrapper">
-          {value ? (
-            <img src={value} alt="Preview" className="image-preview-thumb" />
-          ) : (
-            <div className="image-empty-placeholder">
-              <span className="placeholder-icon">📷</span>
-              <span className="placeholder-text">No image selected</span>
-            </div>
-          )}
-        </div>
+      <span className="image-picker-label">
+        {folder === 'certificates' ? 'Certificate Media Asset / صورة الشهادة' : 'Project Cover Media / صورة المشروع'}
+      </span>
 
-        <div className="image-actions-wrapper">
-          {value ? (
-            <div className="image-status-bar">
-              <span className="image-status-indicator">● Active Asset</span>
+      <div className="image-stacked-body">
+        {value ? (
+          <div className="image-banner-preview">
+            <img src={value} alt="Preview" className="image-banner-thumb" />
+            <div className="image-banner-glass-bar">
+              <span className="image-status-pill">● Active Asset</span>
               <span className="image-filename" title={displayName}>{displayName}</span>
             </div>
-          ) : (
-            <span className="image-status-hint">JPEG, PNG, or WebP up to 10MB</span>
-          )}
-
-          {busy && (
-            <div className="image-upload-progress">
-              <span className="spinner" />
-              <span>{statusText || 'Processing…'}</span>
+          </div>
+        ) : (
+          <label className="image-empty-dropzone">
+            <div className="dropzone-icon-circle">
+              <Upload size={22} />
             </div>
-          )}
-
-          {uploadError && (
-            <div className="image-upload-error" role="alert">
-              {uploadError}
+            <div className="dropzone-text-group">
+              <span className="dropzone-main-text">
+                {busy ? (statusText || 'Uploading image…') : 'Click to choose image'}
+              </span>
+              <span className="dropzone-sub-text">Supports WebP, PNG, JPEG up to 10MB</span>
             </div>
-          )}
+            <input
+              type="file"
+              accept="image/*"
+              hidden
+              disabled={busy}
+              onChange={async (e) => {
+                const f = e.target.files?.[0];
+                if (!f) return;
+                setBusy(true);
+                setUploadError('');
+                try {
+                  const newUrl = await uploadImage(f, folder, setStatusText);
+                  onChange(newUrl);
+                } catch (err) {
+                  setUploadError(err instanceof Error ? err.message : String(err));
+                } finally {
+                  setBusy(false);
+                  setStatusText('');
+                  e.target.value = '';
+                }
+              }}
+            />
+          </label>
+        )}
 
-          <div className="image-buttons-row">
-            <label className="primary-action image-upload-btn">
-              {busy ? 'Uploading…' : value ? 'Replace image' : 'Choose image'}
+        {busy && (
+          <div className="image-upload-progress">
+            <span className="spinner" />
+            <span>{statusText || 'Processing & optimizing image…'}</span>
+          </div>
+        )}
+
+        {uploadError && (
+          <div className="image-upload-error" role="alert">
+            {uploadError}
+          </div>
+        )}
+
+        {value && (
+          <div className="image-toolbar-row">
+            <label className="secondary-action image-replace-btn">
+              <Upload size={14} />
+              <span>{busy ? 'Uploading…' : 'Replace image'}</span>
               <input
                 type="file"
                 accept="image/*"
@@ -245,17 +286,15 @@ function ImagePicker({
               />
             </label>
 
-            {value && (
-              <button
-                type="button"
-                className="text-action image-remove-btn"
-                onClick={() => onChange('')}
-              >
-                Remove
-              </button>
-            )}
+            <button
+              type="button"
+              className="text-action image-remove-btn"
+              onClick={() => onChange('')}
+            >
+              Remove
+            </button>
           </div>
-        </div>
+        )}
       </div>
     </div>
   );
@@ -637,7 +676,18 @@ function TechnologyListEditor({
 
 export function AdminDashboard() {
   const navigate = useNavigate();
-  const [tab, setTab] = useState<AdminTab>('overview');
+  const { tab: routeTab } = useParams<{ tab?: string }>();
+  const tab: AdminTab = routeTab && (VALID_TABS as readonly string[]).includes(routeTab)
+    ? (routeTab as AdminTab)
+    : 'overview';
+
+  const setTab = useCallback((selected: AdminTab) => {
+    if (selected === 'overview') {
+      navigate('/admin/dashboard');
+    } else {
+      navigate(`/admin/dashboard/${selected}`);
+    }
+  }, [navigate]);
   const [ready, setReady] = useState(false);
   const [saving, setSaving] = useState(false);
   const [loadError, setLoadError] = useState('');
@@ -1172,7 +1222,8 @@ export function AdminDashboard() {
               locale={adminLocale}
               makeNew={() => ({
                 name: '', year: '2026', category: 'fullstack', headline_en: '', headline_ar: '',
-                summary_en: '', summary_ar: '', tags: ['React', 'TypeScript'], demo_url: '', code_url: '', image_url: '', sort_order: projects.length + 1,
+                summary_en: '', summary_ar: '', problem: '', solution: '', my_role: '',
+                tags: ['React', 'TypeScript'], demo_url: '', code_url: '', image_url: '', sort_order: projects.length + 1,
               })}
               onSave={(r) => saveRow('projects', r as unknown as Record<string, unknown>)}
               onRequestDelete={(row) => handleDeleteClick('projects', row.id!, row.name)}
@@ -1192,6 +1243,28 @@ export function AdminDashboard() {
                   <Field label="العنوان التسويقي (عربي)" value={row.headline_ar} onChange={set('headline_ar')} />
                   <Field label="Summary (EN)" value={row.summary_en} onChange={set('summary_en')} textarea />
                   <Field label="الوصف الكامل (عربي)" value={row.summary_ar} onChange={set('summary_ar')} textarea />
+
+                  {/* Case Study Details */}
+                  <Field
+                    label="My Role in Project / دوري في المشروع"
+                    value={row.my_role || ''}
+                    onChange={set('my_role')}
+                    placeholder="e.g. Lead Full-Stack Developer — Built database schema, auth & React UI"
+                  />
+                  <Field
+                    label="The Problem & Challenge / المشكلة والتحدي"
+                    value={row.problem || ''}
+                    onChange={set('problem')}
+                    textarea
+                    placeholder="Describe the challenge or core problem this project was created to solve..."
+                  />
+                  <Field
+                    label="What Was Done & Solution / ما تم إنجازه والحل"
+                    value={row.solution || ''}
+                    onChange={set('solution')}
+                    textarea
+                    placeholder="Describe the technical solution, key architectural decisions and deliverables..."
+                  />
 
                   {/* Interactive Technology Selector with Icon Picker */}
                   <TechnologyListEditor

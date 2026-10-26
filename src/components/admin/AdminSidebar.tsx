@@ -1,4 +1,5 @@
 import React from 'react';
+import { Link } from 'react-router';
 import {
   LayoutDashboard,
   Briefcase,
@@ -12,6 +13,7 @@ import {
   Settings,
   LogOut,
   ChevronRight,
+  ArrowLeft,
   X,
 } from 'lucide-react';
 import type { Locale } from '../../types';
@@ -133,6 +135,19 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
           >
             <X size={18} />
           </button>
+        </div>
+
+        {/* Back to Live Portfolio Action */}
+        <div className="admin-sidebar-return-wrap">
+          <Link
+            to="/"
+            className="admin-sidebar-return-btn"
+            title={t.viewLiveSite}
+            aria-label={t.viewLiveSite}
+          >
+            <ArrowLeft size={16} className="sidebar-return-icon rtl-flip" />
+            <span className="sidebar-return-text">{t.viewLiveSite}</span>
+          </Link>
         </div>
 
         {/* Navigation Groups */}

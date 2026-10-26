@@ -130,11 +130,21 @@ export const AdminTopBar: React.FC<AdminTopBarProps> = ({
             <div className="admin-notif-popover" role="dialog" aria-label={t.notificationsTitle}>
               <div className="notif-popover-header">
                 <span className="notif-popover-title">{t.notificationsTitle}</span>
-                {pendingReviewsCount > 0 && (
-                  <span className="notif-popover-count">
-                    {pendingReviewsCount}
-                  </span>
-                )}
+                <div className="notif-popover-header-actions">
+                  {pendingReviewsCount > 0 && (
+                    <span className="notif-popover-count">
+                      {pendingReviewsCount}
+                    </span>
+                  )}
+                  <button
+                    type="button"
+                    className="notif-popover-close-btn"
+                    onClick={() => setShowNotifications(false)}
+                    aria-label={t.close}
+                  >
+                    <X size={15} />
+                  </button>
+                </div>
               </div>
               <div className="notif-popover-body">
                 {pendingReviewsCount > 0 ? (
