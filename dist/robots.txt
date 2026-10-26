@@ -3,4 +3,5 @@ Allow: /
 Disallow: /admin
 Disallow: /admin/*
 
-Sitemap: https://tahahodhod.com/sitemap.xml
+# BASE_URL_CONFIG: Update sitemap domain if switching to custom domain
+Sitemap: https://my-portfolio-two-gamma-xa2fur93st.vercel.app/sitemap.xml
