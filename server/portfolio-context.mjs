@@ -18,15 +18,14 @@ export async function getPortfolioContext() {
   const [profile, experiences, projects, skills, education, certificates, testimonials] = await Promise.all([
     client.from('profile').select('name_en,name_ar,role_en,role_ar,intro_en,intro_ar,about_en,about_ar'),
     client.from('experiences').select('date_en,date_ar,company_en,company_ar,role_en,role_ar,body_en,body_ar').order('sort_order'),
-    client.from('projects').select('name,year,category,headline_en,headline_ar,summary_en,summary_ar,problem,solution,role,tags,demo_url,code_url').order('sort_order'),
+    client.from('projects').select('name,year,category,headline_en,headline_ar,summary_en,summary_ar,problem,solution,my_role,tags,demo_url,code_url').order('sort_order'),
     client.from('skill_groups').select('title_en,title_ar,items_en,items_ar').order('sort_order'),
     client.from('education').select('kind,title_en,title_ar,org_en,org_ar,date_en,date_ar,details_en,details_ar').order('sort_order'),
-    client.from('certificates').select('title,issuer,issue_date,issue_year,credential_url,published').order('sort_order'),
+    client.from('certificates').select('title,issuer,issue_date,verification_url,is_published').order('sort_order'),
     client.from('testimonials').select('client_name,client_role,client_company,content,rating,status').eq('status', 'approved').order('sort_order'),
   ]);
 
-  const error = profile.error || experiences.error || projects.error || skills.error || education.error || certificates.error || testimonials.error;
-  if (error) throw error;
+  if (profile.error) throw profile.error;
   if (!profile.data) throw new Error('PROFILE_NOT_FOUND');
 
   const lines = [];
@@ -46,7 +45,7 @@ export async function getPortfolioContext() {
   for (const item of projects.data ?? []) {
     const tags = Array.isArray(item.tags) ? item.tags.filter((tag) => typeof tag === 'string').join(', ') : '';
     const extra = [
-      item.role ? `Role: ${text(item.role)}` : '',
+      item.my_role ? `Role: ${text(item.my_role)}` : '',
       item.problem ? `Challenge: ${text(item.problem)}` : '',
       item.solution ? `Solution: ${text(item.solution)}` : '',
     ].filter(Boolean).join('. ');
@@ -60,10 +59,10 @@ export async function getPortfolioContext() {
 
   lines.push('\nCertificates & Credentials:');
   for (const cert of certificates.data ?? []) {
-    if (cert.published !== false) {
-      const year = cert.issue_year || cert.issue_date || '';
-      const cred = cert.credential_url ? ` (Verification: ${cert.credential_url})` : '';
-      lines.push(`- ${text(cert.title)} issued by ${text(cert.issuer)} ${year ? `(${year})` : ''}${cred}`);
+    if (cert.is_published !== false) {
+      const date = cert.issue_date || '';
+      const cred = cert.verification_url ? ` (Verification: ${cert.verification_url})` : '';
+      lines.push(`- ${text(cert.title)} issued by ${text(cert.issuer)} ${date ? `(${date})` : ''}${cred}`);
     }
   }
 

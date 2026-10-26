@@ -136,7 +136,8 @@ export async function handleChatBody(method, body, ip = "unknown") {
         },
       };
     return { status: 200, payload: { answer: answer.trim() } };
-  } catch {
+  } catch (err) {
+    console.error("Chat API error:", err);
     return {
       status: 502,
       payload: {
