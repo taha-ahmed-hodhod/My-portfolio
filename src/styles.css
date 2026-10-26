@@ -4,14 +4,8 @@
   font-weight: 100 900;
   font-display: swap;
 }
-@font-face {
-  font-family: "Noto Sans SC";
-  src: url("/fonts/noto-sans-sc-resume.woff2") format("woff2");
-  font-weight: 100 900;
-  font-display: swap;
-}
 :root {
-  font-family: Geist, "Noto Sans SC", sans-serif;
+  font-family: Geist, Cairo, sans-serif;
   color: #f1f5f9;
   background: #080d11;
   font-synthesis: none;
@@ -1372,7 +1366,7 @@ section[id] {
   body {
     background: #fff !important;
     color: #111;
-    font-family: Geist, "Noto Sans SC", sans-serif;
+    font-family: Geist, Cairo, sans-serif;
     font-size: 10pt;
   }
   .screen-content,

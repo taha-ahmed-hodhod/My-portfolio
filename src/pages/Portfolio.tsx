@@ -6,6 +6,7 @@ import { Sculpture } from '../Sculpture';
 import { DigitalTwinChat } from '../components/DigitalTwinChat';
 import { findTechnologyIcons, isSameTechnology, savedTechnologyIconUrl } from '../lib/technology-icons';
 import { supabase } from '../lib/supabase';
+import { safeUrl } from '../lib/url';
 
 function Arrow({ diagonal = false }: { diagonal?: boolean }) {
   return <span aria-hidden="true">{diagonal ? '↗' : '↘'}</span>;
@@ -69,6 +70,7 @@ function TechnologyIcon({ technology }: { technology: { name: string; icon: stri
       src={iconUrl}
       alt=""
       loading="lazy"
+      decoding="async"
       onError={() => {
         if (candidateIndex + 1 < candidates.length) setCandidateIndex((index) => index + 1);
         else setFailed(true);
@@ -96,11 +98,13 @@ function SkeletonImage({
   alt,
   className = '',
   loading = 'lazy',
+  fetchPriority,
 }: {
   src: string;
   alt: string;
   className?: string;
   loading?: 'lazy' | 'eager';
+  fetchPriority?: 'high' | 'low' | 'auto';
 }) {
   const [loaded, setLoaded] = useState(false);
 
@@ -111,6 +115,8 @@ function SkeletonImage({
         src={src}
         alt={alt}
         loading={loading}
+        fetchPriority={fetchPriority}
+        decoding="async"
         className={`${className} ${loaded ? 'img-fade-in' : 'img-hidden'}`}
         onLoad={() => setLoaded(true)}
       />
@@ -120,9 +126,15 @@ function SkeletonImage({
 
 function Cover({ p, index }: { p: Project; index: number }) {
   if (p.image_url) {
+    const isFirst = index === 0;
     return (
       <div className="project-visual cover-img">
-        <SkeletonImage src={p.image_url} alt={p.name} loading="lazy" />
+        <SkeletonImage
+          src={p.image_url}
+          alt={p.name}
+          loading={isFirst ? 'eager' : 'lazy'}
+          fetchPriority={isFirst ? 'high' : undefined}
+        />
       </div>
     );
   }
@@ -174,6 +186,7 @@ export function Portfolio({ data, locale, setLocale }: { data: PortfolioData; lo
   const [feedbackRole, setFeedbackRole] = useState('');
   const [feedbackCompany, setFeedbackCompany] = useState('');
   const [feedbackContent, setFeedbackContent] = useState('');
+  const [feedbackHoneypot, setFeedbackHoneypot] = useState('');
   const [feedbackRating, setFeedbackRating] = useState(5);
   const [submittingFeedback, setSubmittingFeedback] = useState(false);
   const [feedbackStatus, setFeedbackStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
@@ -338,8 +351,21 @@ export function Portfolio({ data, locale, setLocale }: { data: PortfolioData; lo
 
   async function handleFeedbackSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!feedbackName.trim() || !feedbackContent.trim()) {
+    if (feedbackHoneypot) {
+      setFeedbackOpen(false);
+      return;
+    }
+    const name = feedbackName.trim();
+    const role = feedbackRole.trim();
+    const company = feedbackCompany.trim();
+    const content = feedbackContent.trim();
+
+    if (!name || !content) {
       setFeedbackStatus({ type: 'error', message: locale === 'ar' ? 'يرجى ملء الحقول المطلوبة' : 'Please fill in required fields.' });
+      return;
+    }
+    if (name.length > 100 || role.length > 100 || company.length > 100 || content.length > 600) {
+      setFeedbackStatus({ type: 'error', message: locale === 'ar' ? 'النص المدخل تجاوز الحد الأقصى المسموح به' : 'Input exceeds maximum character limit.' });
       return;
     }
     if (!supabase) {
@@ -350,11 +376,11 @@ export function Portfolio({ data, locale, setLocale }: { data: PortfolioData; lo
     setFeedbackStatus(null);
     try {
       const { error } = await supabase.from('testimonials').insert([{
-        client_name: feedbackName.trim(),
-        client_role: feedbackRole.trim(),
-        client_company: feedbackCompany.trim(),
-        content: feedbackContent.trim(),
-        rating: feedbackRating,
+        client_name: name.slice(0, 100),
+        client_role: role.slice(0, 100),
+        client_company: company.slice(0, 100),
+        content: content.slice(0, 600),
+        rating: Math.min(5, Math.max(1, feedbackRating)),
         status: 'pending',
       }]);
       if (error) throw error;
@@ -366,6 +392,7 @@ export function Portfolio({ data, locale, setLocale }: { data: PortfolioData; lo
         setFeedbackRole('');
         setFeedbackCompany('');
         setFeedbackContent('');
+        setFeedbackHoneypot('');
         setFeedbackRating(5);
       }, 2500);
     } catch (err) {
@@ -401,7 +428,7 @@ export function Portfolio({ data, locale, setLocale }: { data: PortfolioData; lo
       <div className="screen-content">
         <DigitalTwinChat locale={locale} />
         <header className="site-header">
-          <a href="#top" className="wordmark" aria-label={name}>
+          <a href="#top" className="wordmark" aria-label={`${name} — ${t.resumeLabel}`}>
             <span className="logo-mark" aria-hidden="true">✳</span>
             <span>{name.toUpperCase()}<small>{t.resumeLabel}</small></span>
           </a>
@@ -410,7 +437,14 @@ export function Portfolio({ data, locale, setLocale }: { data: PortfolioData; lo
               <a key={sec.id} href={'#' + sec.id}>{sec.label}<span>0{i + 1}</span></a>
             ))}
           </nav>
-          <button className="locale-button" aria-label={t.language} onClick={() => setLocale(locale === 'ar' ? 'en' : 'ar')}>
+          <button
+            type="button"
+            className="locale-button"
+            aria-label={locale === 'en' ? 'التحويل إلى العربية' : 'Switch to English'}
+            title={locale === 'en' ? 'عرض الموقع باللغة العربية' : 'Switch display language to English'}
+            lang={locale === 'en' ? 'ar' : 'en'}
+            onClick={() => setLocale(locale === 'ar' ? 'en' : 'ar')}
+          >
             <span className={locale === 'ar' ? 'locale-active' : ''}>ع</span><i>/</i><span className={locale === 'en' ? 'locale-active' : ''}>EN</span>
           </button>
           <Link className="admin-link" to="/admin">{t.admin}</Link>
@@ -476,26 +510,32 @@ export function Portfolio({ data, locale, setLocale }: { data: PortfolioData; lo
                 </span>
               </div>
               <div className={'project-grid projects-container-transition ' + (isFiltering ? 'is-changing ' : '') + (paginatedItems.length === 1 ? 'single-result' : '')}>
-                {paginatedItems.map((proj, i) => {
-                  const globalIndex = (safePage - 1) * PROJECTS_PER_PAGE + i;
-                  return (
-                    <article key={proj.id ?? proj.name} className="project-card">
-                      <button className="project-open" onClick={() => setSelected(proj.id ?? null)} aria-label={proj.name}>
-                        <Cover p={proj} index={globalIndex} />
-                        <div className="project-caption">
-                          <div>
-                            <span className="project-number">/{String(globalIndex + 1).padStart(2, '0')}</span>
-                            <h3>{proj.name}</h3>
-                            <span className="project-year">{proj.year}</span>
+                {paginatedItems.length === 0 ? (
+                  <div className="project-empty-state" role="status">
+                    <p>{locale === 'ar' ? 'لا توجد مشاريع في هذا التصنيف حالياً.' : 'No projects found in this category.'}</p>
+                  </div>
+                ) : (
+                  paginatedItems.map((proj, i) => {
+                    const globalIndex = (safePage - 1) * PROJECTS_PER_PAGE + i;
+                    return (
+                      <article key={proj.id ?? proj.name} className="project-card">
+                        <button className="project-open" onClick={() => setSelected(proj.id ?? null)} aria-label={proj.name}>
+                          <Cover p={proj} index={globalIndex} />
+                          <div className="project-caption">
+                            <div>
+                              <span className="project-number">/{String(globalIndex + 1).padStart(2, '0')}</span>
+                              <h3>{proj.name}</h3>
+                              <span className="project-year">{proj.year}</span>
+                            </div>
+                            <span className="project-arrow"><Arrow diagonal /></span>
                           </div>
-                          <span className="project-arrow"><Arrow diagonal /></span>
-                        </div>
-                        <p className="project-headline">{L(proj.headline_en, proj.headline_ar)}</p>
-                        <div className="project-tags">{proj.tags.map((tag) => <span key={tag}>{tag}</span>)}</div>
-                      </button>
-                    </article>
-                  );
-                })}
+                          <p className="project-headline">{L(proj.headline_en, proj.headline_ar)}</p>
+                          <div className="project-tags">{proj.tags.map((tag) => <span key={tag}>{tag}</span>)}</div>
+                        </button>
+                      </article>
+                    );
+                  })
+                )}
               </div>
 
               {totalPages > 1 && (
@@ -734,7 +774,7 @@ export function Portfolio({ data, locale, setLocale }: { data: PortfolioData; lo
                         : [...data.testimonials, ...data.testimonials]
                       ).map((item, idx) => (
                         <article key={`t1-${item.id ?? item.client_name}-${idx}`} className="testimonial-card">
-                          <div className="testimonial-stars" aria-label={`${item.rating || 5} out of 5 stars`}>
+                          <div className="testimonial-stars" role="img" aria-label={`${item.rating || 5} out of 5 stars`}>
                             {Array.from({ length: item.rating || 5 }).map((_, i) => (
                               <span key={i} className="star-icon" aria-hidden="true">★</span>
                             ))}
@@ -766,7 +806,7 @@ export function Portfolio({ data, locale, setLocale }: { data: PortfolioData; lo
                         : [...data.testimonials, ...data.testimonials]
                       ).map((item, idx) => (
                         <article key={`t2-${item.id ?? item.client_name}-${idx}`} className="testimonial-card" tabIndex={-1}>
-                          <div className="testimonial-stars" aria-label={`${item.rating || 5} out of 5 stars`}>
+                          <div className="testimonial-stars" role="img" aria-label={`${item.rating || 5} out of 5 stars`}>
                             {Array.from({ length: item.rating || 5 }).map((_, i) => (
                               <span key={i} className="star-icon" aria-hidden="true">★</span>
                             ))}
@@ -822,8 +862,8 @@ export function Portfolio({ data, locale, setLocale }: { data: PortfolioData; lo
                   <a className="text-action" href={'tel:' + p.phone.replace(/\s/g, '')}>{t.callMe} · {p.phone}</a>
                 </div>
                 <div className="contact-social">
-                  {p.github && <a href={p.github} target="_blank" rel="noreferrer">GitHub ↗</a>}
-                  {p.linkedin && <a href={p.linkedin} target="_blank" rel="noreferrer">LinkedIn ↗</a>}
+                  {p.github && <a href={safeUrl(p.github)} target="_blank" rel="noopener noreferrer">GitHub ↗</a>}
+                  {p.linkedin && <a href={safeUrl(p.linkedin)} target="_blank" rel="noopener noreferrer">LinkedIn ↗</a>}
                 </div>
                 <div className="resume-actions">
                   <a href={cvPdfUrl} download="Taha_Ahmed_Hodhod_CV.pdf" target="_blank" rel="noopener noreferrer" onClick={() => setNotice(t.downloaded)}>{t.download} ↓</a>
@@ -961,12 +1001,12 @@ export function Portfolio({ data, locale, setLocale }: { data: PortfolioData; lo
               {/* 5. Live Demo and Code Links */}
               <div className="dialog-links">
                 {project.demo_url && (
-                  <a className="primary-action" href={project.demo_url} target="_blank" rel="noreferrer">
+                  <a className="primary-action" href={safeUrl(project.demo_url)} target="_blank" rel="noopener noreferrer">
                     {t.viewDemo}<span aria-hidden="true">↗</span>
                   </a>
                 )}
                 {project.code_url && (
-                  <a className="text-action" href={project.code_url} target="_blank" rel="noreferrer">
+                  <a className="text-action" href={safeUrl(project.code_url)} target="_blank" rel="noopener noreferrer">
                     {t.viewCode} ↗
                   </a>
                 )}
@@ -1017,7 +1057,7 @@ export function Portfolio({ data, locale, setLocale }: { data: PortfolioData; lo
               </div>
               <div className="dialog-links">
                 {selectedCertificate.verification_url ? (
-                  <a className="primary-action" href={selectedCertificate.verification_url} target="_blank" rel="noreferrer">
+                  <a className="primary-action" href={safeUrl(selectedCertificate.verification_url)} target="_blank" rel="noopener noreferrer">
                     {t.verifyCredential} <span aria-hidden="true">↗</span>
                   </a>
                 ) : null}
@@ -1060,10 +1100,22 @@ export function Portfolio({ data, locale, setLocale }: { data: PortfolioData; lo
           )}
 
           <form className="feedback-form" onSubmit={handleFeedbackSubmit}>
+            {/* Honeypot field for bot spam protection */}
+            <input
+              type="text"
+              name="client_website_hp"
+              value={feedbackHoneypot}
+              onChange={(e) => setFeedbackHoneypot(e.target.value)}
+              style={{ display: 'none' }}
+              tabIndex={-1}
+              autoComplete="off"
+              aria-hidden="true"
+            />
             <label className="af">
               <span>{t.nameField}</span>
               <input
                 required
+                maxLength={100}
                 value={feedbackName}
                 onChange={(e) => setFeedbackName(e.target.value)}
                 placeholder={locale === 'ar' ? 'مثال: محمد علي' : 'e.g. Alex Morgan'}
@@ -1073,6 +1125,7 @@ export function Portfolio({ data, locale, setLocale }: { data: PortfolioData; lo
               <label className="af">
                 <span>{t.roleField}</span>
                 <input
+                  maxLength={100}
                   value={feedbackRole}
                   onChange={(e) => setFeedbackRole(e.target.value)}
                   placeholder={locale === 'ar' ? 'مثال: مدير تقني' : 'e.g. Engineering Lead'}
@@ -1081,6 +1134,7 @@ export function Portfolio({ data, locale, setLocale }: { data: PortfolioData; lo
               <label className="af">
                 <span>{t.companyField}</span>
                 <input
+                  maxLength={100}
                   value={feedbackCompany}
                   onChange={(e) => setFeedbackCompany(e.target.value)}
                   placeholder={locale === 'ar' ? 'مثال: شركة التقنية' : 'e.g. TechCorp'}
@@ -1107,6 +1161,7 @@ export function Portfolio({ data, locale, setLocale }: { data: PortfolioData; lo
               <span>{t.feedbackField}</span>
               <textarea
                 required
+                maxLength={600}
                 rows={4}
                 value={feedbackContent}
                 onChange={(e) => setFeedbackContent(e.target.value)}

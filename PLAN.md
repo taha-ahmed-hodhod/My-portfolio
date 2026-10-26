@@ -347,3 +347,15 @@ The implementation order may be adjusted after the audit reveals dependencies in
 - [x] Decoupled Admin i18n dictionary (`src/adminI18n.ts`) with runtime Arabic / English switching and RTL/LTR support.
 - [x] Full accessibility with keyboard focus rings, Escape key modal dismiss, and reduced-motion support.
 - [x] Dynamic Curriculum Vitae (CV / Resume) management: Supabase Storage PDF upload via Bento Profile Manager (`CvPicker`), storage bucket configuration, and dynamic binding across all public portfolio "Download CV" buttons with fallback.
+- [x] Phase 11 — Production Code Audit & Performance Optimization:
+  - Security headers & 1-year immutable asset caching in `vercel.json`.
+  - Removal of unused 185 KB Noto Sans SC Chinese font dead weight.
+  - URL protocol sanitation helper `safeUrl()` preventing `javascript:` and `data:` XSS.
+  - Origin / Referer validation in `api/chat.js` preventing cross-site chatbot API theft.
+  - WCAG 2.5.3 (Label-in-Name) and ARIA accessibility fixes across Portfolio wordmark, locale toggle, and rating stars.
+  - Bot honeypot input and length boundaries on client testimonial submissions.
+  - Sculpture 3D math & DPR optimization on mobile, with visibility-aware animation lifecycle.
+  - First project cover image optimized with `loading="eager"` and `fetchPriority="high"` for mobile LCP.
+  - Hybrid 3-minute staleness + Realtime reconnection recovery in `data.ts`.
+  - Vite `manualChunks` subpath function, slashing initial entry chunk from 211 KB to 30.98 KB (8.32 KB gzipped).
+  - Replacement of 53 KB raster base64 SVG with clean 0.8 KB native vector SVG logo mark.

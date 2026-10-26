@@ -99,14 +99,25 @@ export function usePortfolio() {
     load();
   }, [load]);
 
-  // Refresh when user returns to portfolio tab
+  // Refresh when user returns after being away (> 3 minutes)
+  // or when the Realtime channel reconnects after an error
   useEffect(() => {
-    const handleFocus = () => {
-      cachedData = null;
-      void load(true);
+    let lastHiddenAt = 0;
+    const STALE_THRESHOLD_MS = 3 * 60 * 1000;
+
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        lastHiddenAt = Date.now();
+      } else {
+        const wasHiddenFor = Date.now() - lastHiddenAt;
+        if (lastHiddenAt > 0 && wasHiddenFor >= STALE_THRESHOLD_MS) {
+          cachedData = null;
+          void load(true);
+        }
+      }
     };
-    window.addEventListener('focus', handleFocus);
-    return () => window.removeEventListener('focus', handleFocus);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
   }, [load]);
 
   useEffect(() => {
@@ -117,6 +128,7 @@ export function usePortfolio() {
       void load(true);
     };
 
+    let hadConnectionIssue = false;
     const channel = client
       .channel('portfolio-content')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'profile' }, handleRealtimeChange)
@@ -129,7 +141,15 @@ export function usePortfolio() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'certificates' }, handleRealtimeChange)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'testimonials' }, handleRealtimeChange)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'site_settings' }, handleRealtimeChange)
-      .subscribe();
+      .subscribe((status) => {
+        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          hadConnectionIssue = true;
+        } else if (status === 'SUBSCRIBED' && hadConnectionIssue) {
+          hadConnectionIssue = false;
+          cachedData = null;
+          void load(true);
+        }
+      });
 
     return () => {
       void client.removeChannel(channel);

@@ -66,35 +66,41 @@ export function Sculpture({ labels: c }: { labels: SculptureLabels }) {
           zz,
         ];
       }
-      for (let i = 0; i < 76; i++) {
+      const isMobile = width < 600;
+      const rings = isMobile ? 46 : 76;
+      const ringSteps = isMobile ? 44 : 70;
+      const radials = isMobile ? 14 : 22;
+      const radialSteps = isMobile ? 84 : 140;
+
+      for (let i = 0; i < rings; i++) {
         const pts: [number, number][] = [];
         let depth = 0;
-        for (let j = 0; j <= 70; j++) {
+        for (let j = 0; j <= ringSteps; j++) {
           const p = surfacePoint(
-              (i / 76) * Math.PI * 2,
-              (j / 70) * Math.PI * 2,
+              (i / rings) * Math.PI * 2,
+              (j / ringSteps) * Math.PI * 2,
               formRef.current,
             ),
             t = project(...p);
           pts.push([t[0], t[1]]);
           depth += t[2];
         }
-        paths.push({ z: depth / 71, points: pts, alpha: 0.3 });
+        paths.push({ z: depth / (ringSteps + 1), points: pts, alpha: 0.3 });
       }
-      for (let i = 0; i < 22; i++) {
+      for (let i = 0; i < radials; i++) {
         const pts: [number, number][] = [];
         let depth = 0;
-        for (let j = 0; j <= 140; j++) {
+        for (let j = 0; j <= radialSteps; j++) {
           const p = surfacePoint(
-              (j / 140) * Math.PI * 2,
-              (i / 22) * Math.PI * 2,
+              (j / radialSteps) * Math.PI * 2,
+              (i / radials) * Math.PI * 2,
               formRef.current,
             ),
             t = project(...p);
           pts.push([t[0], t[1]]);
           depth += t[2];
         }
-        paths.push({ z: depth / 141, points: pts, alpha: 0.17 });
+        paths.push({ z: depth / (radialSteps + 1), points: pts, alpha: 0.17 });
       }
       paths
         .sort((p, q) => p.z - q.z)
@@ -117,7 +123,8 @@ export function Sculpture({ labels: c }: { labels: SculptureLabels }) {
       const rect = node.getBoundingClientRect();
       width = rect.width;
       height = rect.height;
-      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      const isMobile = width < 600;
+      const dpr = Math.min(window.devicePixelRatio || 1, isMobile ? 1.5 : 2);
       node.width = Math.round(width * dpr);
       node.height = Math.round(height * dpr);
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -126,21 +133,49 @@ export function Sculpture({ labels: c }: { labels: SculptureLabels }) {
     const ro = new ResizeObserver(resize);
     ro.observe(node);
     resize();
-    const io = new IntersectionObserver((entries) => {
-      visible = entries[0].isIntersecting;
-    });
-    io.observe(node);
+
+    const isRunning = () => playing && visible && !document.hidden;
+
     const tick = (time: number) => {
-      if (playing && visible && !document.hidden) {
-        angle.current += Math.min(time - last, 40) * 0.00015;
-        draw();
+      if (!isRunning()) {
+        raf = 0;
+        return;
       }
+      angle.current += Math.min(time - last, 40) * 0.00015;
+      draw();
       last = time;
       raf = requestAnimationFrame(tick);
     };
-    if (playing) raf = requestAnimationFrame(tick);
+
+    const startLoop = () => {
+      if (isRunning() && !raf) {
+        last = performance.now();
+        raf = requestAnimationFrame(tick);
+      }
+    };
+
+    const io = new IntersectionObserver((entries) => {
+      visible = entries[0].isIntersecting;
+      if (visible) startLoop();
+    });
+    io.observe(node);
+
+    const handleVisibility = () => {
+      if (document.hidden) {
+        if (raf) {
+          cancelAnimationFrame(raf);
+          raf = 0;
+        }
+      } else {
+        startLoop();
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibility);
+    startLoop();
+
     return () => {
-      cancelAnimationFrame(raf);
+      if (raf) cancelAnimationFrame(raf);
+      document.removeEventListener("visibilitychange", handleVisibility);
       ro.disconnect();
       io.disconnect();
     };
