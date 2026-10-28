@@ -324,6 +324,12 @@
   height: 15px;
   object-fit: contain;
 }
+.technology-chip img[src*="github"],
+.tech-chip-icon[src*="github"],
+.tech-icon-preview-img[src*="github"],
+.icon-grid-item img[src*="github"] {
+  filter: brightness(0) invert(1);
+}
 .technology-icon-fallback {
   display: inline-flex;
   align-items: center;

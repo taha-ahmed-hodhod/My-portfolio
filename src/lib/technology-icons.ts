@@ -295,12 +295,16 @@ export function savedTechnologyIconUrl(icon: string): string | null {
   }
   if (trimmed.includes(':')) {
     const [prefix, name] = trimmed.split(':', 2);
-    return `https://api.iconify.design/${encodeURIComponent(prefix)}/${encodeURIComponent(name)}.svg`;
+    const isMonochrome = ['jam', 'simple-icons', 'mdi', 'uil', 'tabler', 'octicon', 'lucide', 'feather', 'bi', 'ri'].includes(prefix) || name.toLowerCase().includes('github');
+    const colorParam = isMonochrome ? '?color=white' : '';
+    return `https://api.iconify.design/${encodeURIComponent(prefix)}/${encodeURIComponent(name)}.svg${colorParam}`;
   }
   const curated = curatedIcon(trimmed);
   if (curated) {
     const [prefix, name] = curated.split(':', 2);
-    return `https://api.iconify.design/${encodeURIComponent(prefix)}/${encodeURIComponent(name)}.svg`;
+    const isMonochrome = ['jam', 'simple-icons', 'mdi', 'uil', 'tabler', 'octicon', 'lucide', 'feather', 'bi', 'ri'].includes(prefix) || name.toLowerCase().includes('github');
+    const colorParam = isMonochrome ? '?color=white' : '';
+    return `https://api.iconify.design/${encodeURIComponent(prefix)}/${encodeURIComponent(name)}.svg${colorParam}`;
   }
   return `https://api.iconify.design/logos/${encodeURIComponent(trimmed.toLowerCase())}.svg`;
 }

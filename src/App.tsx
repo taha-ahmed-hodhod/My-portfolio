@@ -12,8 +12,33 @@ const AdminDashboard = lazy(() => import('./pages/AdminDashboard').then((m) => (
 
 function Site() {
   const { data } = usePortfolio();
-  const [locale, setLocale] = useState<Locale>('en');
+  const [locale, setLocaleState] = useState<Locale>(() => {
+    try {
+      const saved = localStorage.getItem('portfolio_locale') || localStorage.getItem('admin_locale');
+      return saved === 'ar' || saved === 'en' ? saved : 'en';
+    } catch {
+      return 'en';
+    }
+  });
   const [revealed, setRevealed] = useState(false);
+
+  const setLocale = (next: Locale) => {
+    setLocaleState(next);
+    try {
+      localStorage.setItem('portfolio_locale', next);
+      localStorage.setItem('admin_locale', next);
+    } catch {}
+  };
+
+  useEffect(() => {
+    const handleStorage = (e: StorageEvent) => {
+      if ((e.key === 'portfolio_locale' || e.key === 'admin_locale') && (e.newValue === 'ar' || e.newValue === 'en')) {
+        setLocaleState(e.newValue);
+      }
+    };
+    window.addEventListener('storage', handleStorage);
+    return () => window.removeEventListener('storage', handleStorage);
+  }, []);
 
   useEffect(() => {
     document.documentElement.lang = locale === 'ar' ? 'ar' : 'en';

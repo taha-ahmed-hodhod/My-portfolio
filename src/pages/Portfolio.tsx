@@ -82,14 +82,29 @@ function TechnologyIcon({ technology }: { technology: { name: string; icon: stri
 function findTechnology(name: string, technologies: PortfolioData['technologies']) {
   if (!name) return undefined;
   const normalized = name.toLowerCase().replace(/\s+/g, ' ').trim();
+  const slug = technologySlug(name);
+
+  // 1. Exact match by name or slug
+  const exact = technologies.find((item) =>
+    isSameTechnology(item.name, name) ||
+    isSameTechnology(item.slug, name) ||
+    item.slug === slug ||
+    item.name.toLowerCase().trim() === normalized
+  );
+  if (exact) return exact;
+
+  // 2. Normalized without version (e.g. "React.js 18" -> "React.js")
+  const withoutVersion = normalized.replace(/\s*\d+(\.\d+)*$/, '').trim();
+  const baseMatch = technologies.find((item) =>
+    item.name.toLowerCase().trim() === withoutVersion ||
+    item.slug === technologySlug(withoutVersion)
+  );
+  if (baseMatch) return baseMatch;
+
+  // 3. Fallback prefix only if item starts with catalogName
   return technologies.find((item) => {
-    if (isSameTechnology(item.name, name) || isSameTechnology(item.slug, name)) {
-      return true;
-    }
     const catalogName = item.name.toLowerCase().trim();
-    return catalogName === normalized
-      || normalized.startsWith(catalogName + ' ')
-      || catalogName.startsWith(normalized + ' ');
+    return normalized.startsWith(catalogName + ' ');
   });
 }
 

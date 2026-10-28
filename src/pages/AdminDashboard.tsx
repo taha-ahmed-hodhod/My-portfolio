@@ -505,8 +505,9 @@ function TechnologyListEditor({
   };
 
   const startEdit = (name: string, index: number) => {
+    const slug = technologySlug(name);
     const matched = technologies.find(
-      (t) => isSameTechnology(t.name, name) || isSameTechnology(t.slug, name)
+      (t) => t.slug === slug || t.name.toLowerCase().trim() === name.toLowerCase().trim() || isSameTechnology(t.name, name) || isSameTechnology(t.slug, name)
     );
     setNameInput(name);
     setIconInput(matched?.icon || curatedIcon(name) || '');
@@ -556,8 +557,9 @@ function TechnologyListEditor({
 
       <div className="tech-chips-tray">
         {selectedNames.map((name, idx) => {
+          const slug = technologySlug(name);
           const matched = technologies.find(
-            (t) => isSameTechnology(t.name, name) || isSameTechnology(t.slug, name)
+            (t) => t.slug === slug || t.name.toLowerCase().trim() === name.toLowerCase().trim() || isSameTechnology(t.name, name) || isSameTechnology(t.slug, name)
           );
           const iconVal = matched?.icon || curatedIcon(name);
           const iconUrl = iconVal ? savedTechnologyIconUrl(iconVal) : null;
@@ -621,8 +623,9 @@ function TechnologyListEditor({
                   const val = e.target.value;
                   setNameInput(val);
                   if (!iconInput || iconInput === curatedIcon(nameInput)) {
+                    const valSlug = technologySlug(val);
                     const matched = technologies.find(
-                      (t) => isSameTechnology(t.name, val) || isSameTechnology(t.slug, val)
+                      (t) => t.slug === valSlug || t.name.toLowerCase().trim() === val.toLowerCase().trim() || isSameTechnology(t.name, val) || isSameTechnology(t.slug, val)
                     );
                     if (matched?.icon) {
                       setIconInput(matched.icon);
@@ -694,17 +697,34 @@ export function AdminDashboard() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [adminUserEmail, setAdminUserEmail] = useState('');
 
-  // Locale state persisted in localStorage
+  // Locale state persisted in localStorage & synchronized with Portfolio
   const [adminLocale, setAdminLocale] = useState<Locale>(() => {
-    const saved = localStorage.getItem('admin_locale');
-    return saved === 'ar' || saved === 'en' ? saved : 'en';
+    try {
+      const saved = localStorage.getItem('portfolio_locale') || localStorage.getItem('admin_locale');
+      return saved === 'ar' || saved === 'en' ? saved : 'en';
+    } catch {
+      return 'en';
+    }
   });
 
   const toggleAdminLocale = () => {
     const next = adminLocale === 'en' ? 'ar' : 'en';
     setAdminLocale(next);
-    localStorage.setItem('admin_locale', next);
+    try {
+      localStorage.setItem('portfolio_locale', next);
+      localStorage.setItem('admin_locale', next);
+    } catch {}
   };
+
+  useEffect(() => {
+    const handleStorage = (e: StorageEvent) => {
+      if ((e.key === 'portfolio_locale' || e.key === 'admin_locale') && (e.newValue === 'ar' || e.newValue === 'en')) {
+        setAdminLocale(e.newValue);
+      }
+    };
+    window.addEventListener('storage', handleStorage);
+    return () => window.removeEventListener('storage', handleStorage);
+  }, []);
 
   const [searchFilter, setSearchFilter] = useState('');
 
@@ -895,6 +915,7 @@ export function AdminDashboard() {
           showToast(`Could not update technology: ${error.message}`, 'error');
         } else {
           showToast(`Updated ${name} icon ✓`, 'success');
+          invalidatePortfolioCache();
           setTechnologies((prev) =>
             prev.map((t) => (t.id === existing.id ? { ...t, icon: updatedIcon, name } : t))
           );
@@ -917,6 +938,7 @@ export function AdminDashboard() {
         showToast(`Could not save technology: ${error.message}`, 'error');
       } else if (data) {
         showToast(`Added ${name} to technologies ✓`, 'success');
+        invalidatePortfolioCache();
         setTechnologies((prev) => [...prev, data]);
       }
     }

@@ -584,6 +584,10 @@ section[id] {
   height: 14px;
   object-fit: contain;
 }
+.project-tags .technology-chip img[src*="github"],
+.technology-chip img[src*="github"] {
+  filter: brightness(0) invert(1);
+}
 .project-tags .technology-chip > span {
   border: none;
   padding: 0;
