@@ -13,6 +13,7 @@ import { AdminProfileManager } from '../components/admin/AdminProfileManager';
 import { AdminTestimonialsManager } from '../components/admin/AdminTestimonialsManager';
 import { AdminSiteSettingsManager } from '../components/admin/AdminSiteSettingsManager';
 import { AdminDashboardSkeleton } from '../components/admin/AdminDashboardSkeleton';
+import { PwaUpdateBanner } from '../components/admin/PwaUpdateBanner';
 import { adminI18n } from '../adminI18n';
 import { Plus, Pencil, Trash2, Save, X, SearchX, Check, Upload, Tag, FileText, ExternalLink } from 'lucide-react';
 
@@ -1162,6 +1163,9 @@ export function AdminDashboard() {
           pendingReviewsCount={counts.testimonialsPending}
           onNavigateToReviews={() => setTab('testimonials')}
         />
+
+        {/* Safe PWA Update Banner */}
+        <PwaUpdateBanner locale={adminLocale} />
 
         <main className="admin-main-stage">
           <header className="admin-stage-header">

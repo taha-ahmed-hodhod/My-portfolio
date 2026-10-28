@@ -65,8 +65,8 @@ export function PortfolioSkeleton({ locale = 'en' }: PortfolioSkeletonProps) {
           </div>
 
           <div className="skeleton-hero-sculpture-col">
-            <div className="skeleton-circle-visual skeleton-shimmer">
-              <div className="skeleton-circle-inner" />
+            <div className="skeleton-square-visual skeleton-shimmer">
+              <div className="skeleton-square-inner" />
             </div>
           </div>
         </section>

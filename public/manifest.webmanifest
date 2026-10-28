@@ -1,0 +1,60 @@
+{
+  "name": "Taha Ahmed Hodhod | Full-Stack Developer",
+  "short_name": "Taha Admin",
+  "description": "Personal developer portfolio and administrative control center for Taha Ahmed Hodhod.",
+  "id": "/",
+  "start_url": "/#/admin/dashboard",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#080d11",
+  "theme_color": "#080d11",
+  "lang": "en",
+  "dir": "auto",
+  "icons": [
+    {
+      "src": "/icon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-maskable-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Portfolio Home",
+      "short_name": "Home",
+      "description": "Open public portfolio presentation",
+      "url": "/",
+      "icons": [
+        {
+          "src": "/icon-192x192.png",
+          "sizes": "192x192"
+        }
+      ]
+    },
+    {
+      "name": "Selected Work",
+      "short_name": "Work",
+      "description": "Jump straight to selected portfolio projects",
+      "url": "/#work",
+      "icons": [
+        {
+          "src": "/icon-192x192.png",
+          "sizes": "192x192"
+        }
+      ]
+    }
+  ]
+}
+

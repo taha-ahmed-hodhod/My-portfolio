@@ -99,6 +99,17 @@ export interface AdminDictionary {
   toastRejectedSuccess: string;
   toastSaveError: string;
   toastAuthRequired: string;
+
+  // PWA & Installation
+  installApp: string;
+  installAppDesc: string;
+  appInstalled: string;
+  runningStandalone: string;
+  iosInstallTitle: string;
+  iosInstallStep1: string;
+  iosInstallStep2: string;
+  iosInstallStep3: string;
+  closeModal: string;
 }
 
 export const adminI18n: Record<Locale, AdminDictionary> = {
@@ -191,6 +202,16 @@ export const adminI18n: Record<Locale, AdminDictionary> = {
     toastRejectedSuccess: 'Testimonial rejected',
     toastSaveError: 'Failed to save changes. Please try again.',
     toastAuthRequired: 'Admin session required for this operation',
+
+    installApp: 'Install App',
+    installAppDesc: 'Install the admin dashboard as a standalone desktop or mobile application.',
+    appInstalled: 'App Installed',
+    runningStandalone: 'Standalone App Active',
+    iosInstallTitle: 'Install on iPhone & iPad',
+    iosInstallStep1: 'Tap the Share button in Safari toolbar.',
+    iosInstallStep2: 'Scroll down and tap "Add to Home Screen".',
+    iosInstallStep3: 'Tap "Add" in the top right corner.',
+    closeModal: 'Got it',
   },
   ar: {
     navSectionMain: 'الرئيسية',
@@ -281,5 +302,15 @@ export const adminI18n: Record<Locale, AdminDictionary> = {
     toastRejectedSuccess: 'تم رفض التقييم بنجاح',
     toastSaveError: 'تعذر حفظ التغييرات. يرجى المحاولة لاحقاً.',
     toastAuthRequired: 'يتطلب هذا الإجراء صلاحيات مدير النظام',
+
+    installApp: 'تثبيت التطبيق',
+    installAppDesc: 'تثبيت لوحة التحكم كتطبيق مستقل على سطح المكتب أو هاتفك المحمول.',
+    appInstalled: 'تم تثبيت التطبيق',
+    runningStandalone: 'يعمل كتطبيق مستقل',
+    iosInstallTitle: 'التثبيت على أجهزة iPhone و iPad',
+    iosInstallStep1: 'اضغط على زر المشاركة (Share) في شريط سفاري.',
+    iosInstallStep2: 'مرر لأسفل واختر "إضافة إلى الشاشة الرئيسية" (Add to Home Screen).',
+    iosInstallStep3: 'اضغط على "إضافة" (Add) في الزاوية العلوية.',
+    closeModal: 'حسناً، فهمت',
   },
 };

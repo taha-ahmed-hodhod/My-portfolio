@@ -1,6 +1,26 @@
-import { defineConfig } from 'vite';
+import { defineConfig, type Plugin } from 'vite';
+import fs from 'node:fs';
+import path from 'node:path';
+
+function stampServiceWorkerPlugin(): Plugin {
+  return {
+    name: 'stamp-service-worker',
+    apply: 'build',
+    closeBundle() {
+      const distSwPath = path.resolve(__dirname, 'dist', 'sw.js');
+      if (fs.existsSync(distSwPath)) {
+        const buildId = Date.now().toString(36);
+        let content = fs.readFileSync(distSwPath, 'utf-8');
+        content = content.replace(/__SW_BUILD_ID__/g, buildId);
+        fs.writeFileSync(distSwPath, content, 'utf-8');
+        console.log(`[PWA] Stamped dist/sw.js with BUILD_ID: ${buildId}`);
+      }
+    },
+  };
+}
 
 export default defineConfig({
+  plugins: [stampServiceWorkerPlugin()],
   base: './',
   server: {
     proxy: {

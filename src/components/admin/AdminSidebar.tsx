@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import type { Locale } from '../../types';
 import { adminI18n } from '../../adminI18n';
+import { AdminInstallButton } from './AdminInstallButton';
 
 export type AdminTab =
   | 'overview'
@@ -192,8 +193,9 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
           ))}
         </nav>
 
-        {/* Pinned User Profile Block */}
+        {/* Pinned User Profile Block & Install Option */}
         <div className="admin-bento-sidebar-footer">
+          <AdminInstallButton locale={locale} variant="sidebar" />
           <div className="admin-user-card" title={adminEmail}>
             <div className="admin-user-avatar">TA</div>
             <div className="admin-user-info">

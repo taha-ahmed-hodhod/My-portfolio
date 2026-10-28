@@ -10,8 +10,11 @@ import {
   Sliders,
   CheckCircle2,
   ShieldCheck,
+  Smartphone,
 } from 'lucide-react';
 import type { Locale } from '../../types';
+import { adminI18n } from '../../adminI18n';
+import { AdminInstallButton } from './AdminInstallButton';
 
 interface SettingTileDef {
   key: string;
@@ -230,6 +233,37 @@ export const AdminSiteSettingsManager: React.FC<AdminSiteSettingsManagerProps> =
               </div>
             );
           })}
+        </div>
+      </div>
+
+      {/* Cluster 3: Desktop & Mobile Application (PWA) */}
+      <div className="settings-cluster-card">
+        <div className="settings-cluster-header">
+          <h4 className="cluster-title">
+            {locale === 'ar' ? 'تطبيق سطح المكتب والهاتف (PWA)' : 'Desktop & Mobile Application (PWA)'}
+          </h4>
+          <span className="cluster-sub">
+            {locale === 'ar'
+              ? 'تثبيت وتشغيل لوحة التحكم كتطبيق مستقل ومحمي مع دعم العمل دون اتصال'
+              : 'Install and run the dashboard as a standalone app with offline fallback support'}
+          </span>
+        </div>
+
+        <div className="settings-tiles-grid">
+          <div className="settings-bento-tile settings-pwa-tile is-active" style={{ gridColumn: '1 / -1' }}>
+            <div className="tile-icon-bubble">
+              <Smartphone size={20} className="tile-icon-teal" />
+            </div>
+            <div className="tile-content">
+              <div className="tile-header-line">
+                <h5 className="tile-title">{locale === 'ar' ? 'تطبيق لوحة التحكم' : 'Dashboard PWA'}</h5>
+              </div>
+              <p className="tile-desc">{adminI18n[locale].installAppDesc}</p>
+            </div>
+            <div className="tile-action-box">
+              <AdminInstallButton locale={locale} variant="settings" />
+            </div>
+          </div>
         </div>
       </div>
     </div>
